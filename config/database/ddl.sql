@@ -5,7 +5,8 @@ DROP TABLE IF EXISTS factory_requests CASCADE;
 DROP TABLE IF EXISTS factories CASCADE;
 DROP TABLE IF EXISTS reports CASCADE;
 DROP TABLE IF EXISTS tokens CASCADE;
-DROP TABLE IF EXISTS transactions CASCADE;
+DROP TABLE IF EXISTS customer_transactions CASCADE;
+DROP TABLE IF EXISTS store_transactions CASCADE;
 DROP TABLE IF EXISTS factory_admins CASCADE;
 DROP TABLE IF EXISTS vendor_admins CASCADE;
 DROP TABLE IF EXISTS store_admins CASCADE;
@@ -100,13 +101,26 @@ CREATE TABLE vendor_admins (
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- Table: Transactions
-CREATE TABLE transactions (
+-- Table: Customer Transactions (e.g., Wallet Top-Ups, Withdrawals)
+CREATE TABLE customer_transactions (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    customer_id UUID REFERENCES customers(id),
+    order_id VARCHAR(50) UNIQUE NOT NULL, -- Order ID for Midtrans reference
+    transaction_type VARCHAR(50) NOT NULL, -- E.g., "Top-Up", "Withdraw"
+    amount DECIMAL(10, 2) NOT NULL,
+    status VARCHAR(50) DEFAULT 'Pending', -- E.g., "Pending", "Completed"
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Table: Store Transactions (e.g., Product Purchases)
+CREATE TABLE store_transactions (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     customer_id UUID REFERENCES customers(id),
     store_id UUID REFERENCES stores(id),
+    items JSONB NOT NULL, -- JSON array of purchased items with quantity and price
     total_amount DECIMAL(10, 2) NOT NULL,
-    items JSONB NOT NULL,
+    status VARCHAR(50) DEFAULT 'Completed', -- E.g., "Completed", "Failed"
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );

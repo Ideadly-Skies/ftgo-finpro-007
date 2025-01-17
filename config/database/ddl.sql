@@ -86,6 +86,7 @@ CREATE TABLE store_admins (
     name VARCHAR(255) NOT NULL,
     email VARCHAR(255) UNIQUE NOT NULL,
     password VARCHAR(255) NOT NULL,
+    jwt_token TEXT, -- Added JWT Token
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -97,6 +98,7 @@ CREATE TABLE vendor_admins (
     name VARCHAR(255) NOT NULL,
     email VARCHAR(255) UNIQUE NOT NULL,
     password VARCHAR(255) NOT NULL,
+    jwt_token TEXT, -- Added JWT Token
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -109,6 +111,7 @@ CREATE TABLE customer_transactions (
     transaction_type VARCHAR(50) NOT NULL, -- E.g., "Top-Up", "Withdraw"
     amount DECIMAL(10, 2) NOT NULL,
     status VARCHAR(50) DEFAULT 'Pending', -- E.g., "Pending", "Completed"
+    is_processed BOOLEAN DEFAULT FALSE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -177,6 +180,7 @@ CREATE TABLE gojek_drivers (
     name VARCHAR(255) NOT NULL,
     phone_number VARCHAR(15) NOT NULL,
     vehicle_details JSONB NOT NULL,
+    jwt_token TEXT, -- Added JWT Token
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -202,8 +206,8 @@ INSERT INTO suppliers (name, contact_info) VALUES
 
 -- Insert sample stores
 INSERT INTO stores (name, products, product_types, supplier_id) VALUES
-('EcoStore', '[{"product":"Plastic Bottle", "price": 1.00, "quantity": 100}, {"product":"Metal Can", "price": 0.80, "quantity": 50}]', '["Plastic", "Metal"]', (SELECT id FROM suppliers LIMIT 1)),
-('GreenShop', '[{"product":"Egg Carton", "price": 0.50, "quantity": 50}, {"product":"Glass Bottle", "price": 1.20, "quantity": 30}]', '["Cardboard", "Glass"]', (SELECT id FROM suppliers OFFSET 1 LIMIT 1));
+('EcoStore', '[{"product":"Plastic Bottle", "price": 15000, "quantity": 100}, {"product":"Metal Can", "price": 12000, "quantity": 50}]', '["Plastic", "Metal"]', (SELECT id FROM suppliers LIMIT 1)),
+('GreenShop', '[{"product":"Egg Carton", "price": 7000, "quantity": 50}, {"product":"Glass Bottle", "price": 20000, "quantity": 30}]', '["Cardboard", "Glass"]', (SELECT id FROM suppliers OFFSET 1 LIMIT 1));
 
 -- Insert sample vendors
 INSERT INTO vendors (name, phone_number, email, password) VALUES

@@ -15,6 +15,7 @@ DROP TABLE IF EXISTS vendors CASCADE;
 DROP TABLE IF EXISTS stores CASCADE;
 DROP TABLE IF EXISTS suppliers CASCADE;
 DROP TABLE IF EXISTS customers CASCADE;
+DROP TABLE IF EXISTS vending_transactions CASCADE;
 
 -- Table: Customers
 CREATE TABLE customers (
@@ -24,7 +25,6 @@ CREATE TABLE customers (
     password VARCHAR(255) NOT NULL,
     jwt_token TEXT,
     wallet_balance DECIMAL(10, 2) DEFAULT 0.00,
-    token_list JSONB DEFAULT '[]',
     inventory JSONB DEFAULT '[]',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -193,6 +193,18 @@ CREATE TABLE gojek_transactions (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+CREATE TABLE vending_transactions (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    customer_id UUID REFERENCES customers(id),
+    store_admin_id UUID REFERENCES store_admins(id),
+    vendor_id UUID REFERENCES vendors(id),
+    materials JSONB NOT NULL,
+    number_of_items INTEGER DEFAULT 0,
+    is_processed BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
 -- DML Queries: Sample Data Population
 -- Insert sample customers
 INSERT INTO customers (name, email, password) VALUES
@@ -206,16 +218,18 @@ INSERT INTO suppliers (name, contact_info) VALUES
 
 -- Insert sample stores
 INSERT INTO stores (name, products, product_types, supplier_id) VALUES
-('EcoStore', '[{"product":"Plastic Bottle", "price": 15000, "quantity": 100}, {"product":"Metal Can", "price": 12000, "quantity": 50}]', '["Plastic", "Metal"]', (SELECT id FROM suppliers LIMIT 1)),
-('GreenShop', '[{"product":"Egg Carton", "price": 7000, "quantity": 50}, {"product":"Glass Bottle", "price": 20000, "quantity": 30}]', '["Cardboard", "Glass"]', (SELECT id FROM suppliers OFFSET 1 LIMIT 1));
-
+('Costco', '[{"product":"Kirkland Signature Bottled Water.", "price": 25000, "quantity": 100}, {"product":"Tide Liquid Laundry Detergent", "price": 30000, "quantity": 50}]', '["PET", "HDPE"]', (SELECT id FROM suppliers LIMIT 1)),
+('Target', '[{"product":"Ziploc Sandwich Bags", "price": 90000, "quantity": 50}, {"product":"Mainstays Outdoor Plastic Stacking Chairs", "price": 180000, "quantity": 30}]', '["LDPE", "PP"]', (SELECT id FROM suppliers OFFSET 1 LIMIT 1));
+ 
 -- Insert sample vendors
 INSERT INTO vendors (name, phone_number, email, password) VALUES
-('Plastic Recycler Co.', '123456789', 'recycler@example.com', 'recyclepass');
+('Plastic Recycler Co.', '123456789', 'recycler@example.com', 'recyclepass'),
+('Recycle Pro', '0987654321', 'admin@recyclepro.com', 'prorecycle123');
 
 -- Insert sample vending machines
 INSERT INTO vending_machines (store_id, vendor_id, type, capacity, compatible_plastics) VALUES
-((SELECT id FROM stores LIMIT 1), (SELECT id FROM vendors LIMIT 1), 'Plastic', 500, '["PET", "HDPE"]');
+((SELECT id FROM stores LIMIT 1), (SELECT id FROM vendors LIMIT 1), 'Plastic', 500, '["PET", "HDPE"]'),
+((SELECT id FROM stores OFFSET 1 LIMIT 1), (SELECT id FROM vendors OFFSET 1 LIMIT 1), 'Plastic', 600, '["LDPE", "PP"]');
 
 -- Insert sample store admins
 INSERT INTO store_admins (store_id, name, email, password) VALUES

@@ -12,7 +12,7 @@ import (
 
 func main(){
 	// migrate data to supabase
-	config.MigrateData()
+	// config.MigrateData()
 
 	// connect to db
 	config.InitDB()
@@ -45,8 +45,9 @@ func main(){
 	adminGroup := e.Group("/store-admin")
 	adminGroup.Use(cust_middleware.JWTMiddleware)
 
-	// facilitate purchase for customer
+	// facilitate purchase & recycling for customer
 	adminGroup.POST("/purchase", admin_handler.FacilitatePurchase)
+	adminGroup.POST("/recycle/:customer_id", admin_handler.RecycleMaterials)
 
 	// start the server at 8080
 	e.Logger.Fatal(e.Start(":8080"))

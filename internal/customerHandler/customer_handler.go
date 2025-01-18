@@ -117,10 +117,10 @@ func LoginCustomer(c echo.Context) error {
 
 	// Fetch customer details
 	var customer Customer
-	query := `SELECT id, name, email, password, wallet_balance, token_list, inventory, is_verified FROM customers WHERE email = $1`
+	query := `SELECT id, name, email, password, wallet_balance, inventory, is_verified FROM customers WHERE email = $1`
 	err := config.Pool.QueryRow(context.Background(), query, req.Email).Scan(
 		&customer.ID, &customer.Name, &customer.Email, &customer.Password,
-		&customer.WalletBalance, &customer.TokenList, &customer.Inventory, &customer.IsVerified,
+		&customer.WalletBalance, &customer.Inventory, &customer.IsVerified,
 	)
 	if err != nil {
 		return c.JSON(http.StatusBadRequest, map[string]string{"message": "Invalid email or password"})
@@ -137,7 +137,6 @@ func LoginCustomer(c echo.Context) error {
 		"name":          customer.Name,
 		"email":         customer.Email,
 		"wallet_balance": customer.WalletBalance,
-		"token_list":    customer.TokenList,
 		"inventory":     customer.Inventory,
 		"is_verified":   customer.IsVerified,
 		"exp":           jwt.NewNumericDate(time.Now().Add(72 * time.Hour)),

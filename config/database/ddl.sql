@@ -1,9 +1,9 @@
 -- DDL Queries: Database Schema Creation
 DROP TABLE IF EXISTS gojek_drivers CASCADE;
 DROP TABLE IF EXISTS gojek_transactions CASCADE;
-DROP TABLE IF EXISTS factory_requests CASCADE;
+DROP TABLE IF EXISTS factory_vendor_requests CASCADE;
 DROP TABLE IF EXISTS factories CASCADE;
-DROP TABLE IF EXISTS reports CASCADE;
+DROP TABLE IF EXISTS vendor_customer_report CASCADE;
 DROP TABLE IF EXISTS tokens CASCADE;
 DROP TABLE IF EXISTS customer_transactions CASCADE;
 DROP TABLE IF EXISTS store_transactions CASCADE;
@@ -16,6 +16,8 @@ DROP TABLE IF EXISTS stores CASCADE;
 DROP TABLE IF EXISTS suppliers CASCADE;
 DROP TABLE IF EXISTS customers CASCADE;
 DROP TABLE IF EXISTS vending_transactions CASCADE;
+DROP TABLE IF EXISTS plastics_pricing CASCADE;
+DROP TABLE IF EXISTS factory_customer_report CASCADE;
 
 -- Table: Customers
 CREATE TABLE customers (
@@ -138,7 +140,7 @@ CREATE TABLE tokens (
 );
 
 -- Table: Reports
-CREATE TABLE reports (
+CREATE TABLE vendor_customer_report (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     vending_machine_id UUID REFERENCES vending_machines(id),
     vendor_id UUID REFERENCES vendors(id),
@@ -166,7 +168,7 @@ CREATE TABLE factory_admins (
 );
 
 -- Table: Factory Requests
-CREATE TABLE factory_requests (
+CREATE TABLE factory_vendor_requests (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     vendor_id UUID REFERENCES vendors(id),
     factory_id UUID REFERENCES factories(id),
@@ -205,6 +207,25 @@ CREATE TABLE vending_transactions (
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+CREATE TABLE plastics_pricing (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    type VARCHAR(50) NOT NULL UNIQUE, -- e.g., PET, HDPE, LDPE
+    price_per_kg DECIMAL(10, 2) NOT NULL, -- Price in the currency
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE factory_customer_report (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    customer_id UUID REFERENCES customers(id),
+    store_admin_id UUID REFERENCES store_admins(id),
+    plastic_type VARCHAR(50) REFERENCES plastics_pricing(type),
+    quantity DECIMAL(10, 2) NOT NULL, -- Quantity in kilograms
+    total_price DECIMAL(10, 2) NOT NULL, -- Total price for the plastic type
+    vendor_customer_report_id UUID REFERENCES vendor_customer_report(id), -- Link to vendor report
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
 -- DML Queries: Sample Data Population
 -- Insert sample customers
 INSERT INTO customers (name, email, password) VALUES
@@ -217,10 +238,27 @@ INSERT INTO suppliers (name, contact_info) VALUES
 ('Eco Materials Inc.', '{"email": "contact@ecomaterials.com", "phone": "987654321"}');
 
 -- Insert sample stores
+-- Insert sample stores with weights added to products
 INSERT INTO stores (name, products, product_types, supplier_id) VALUES
-('Costco', '[{"product":"Kirkland Signature Bottled Water.", "price": 25000, "quantity": 100}, {"product":"Tide Liquid Laundry Detergent", "price": 30000, "quantity": 50}]', '["PET", "HDPE"]', (SELECT id FROM suppliers LIMIT 1)),
-('Target', '[{"product":"Ziploc Sandwich Bags", "price": 90000, "quantity": 50}, {"product":"Mainstays Outdoor Plastic Stacking Chairs", "price": 180000, "quantity": 30}]', '["LDPE", "PP"]', (SELECT id FROM suppliers OFFSET 1 LIMIT 1));
- 
+(
+    'Costco',
+    '[
+        {"product": "Kirkland Signature Bottled Water.", "price": 25000, "quantity": 100, "weight": 0.5},
+        {"product": "Tide Liquid Laundry Detergent", "price": 30000, "quantity": 50, "weight": 2.5}
+    ]',
+    '["PET", "HDPE"]',
+    (SELECT id FROM suppliers LIMIT 1)
+),
+(
+    'Target',
+    '[
+        {"product": "Ziploc Sandwich Bags", "price": 90000, "quantity": 50, "weight": 0.1},
+        {"product": "Mainstays Outdoor Plastic Stacking Chairs", "price": 180000, "quantity": 30, "weight": 5.0}
+    ]',
+    '["LDPE", "PP"]',
+    (SELECT id FROM suppliers OFFSET 1 LIMIT 1)
+);
+
 -- Insert sample vendors
 INSERT INTO vendors (name, phone_number, email, password) VALUES
 ('Plastic Recycler Co.', '123456789', 'recycler@example.com', 'recyclepass'),

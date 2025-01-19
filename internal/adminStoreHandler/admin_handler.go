@@ -173,6 +173,7 @@ func FacilitatePurchase(c echo.Context) error {
     var storeProducts []struct {
         Product  string  `json:"product"`
         Price    float64 `json:"price"`
+        Weight   float64 `json:"weight"` // include weight in here
         Quantity int     `json:"quantity"`
     }
     storeQuery := "SELECT products FROM stores WHERE id = $1"
@@ -186,26 +187,28 @@ func FacilitatePurchase(c echo.Context) error {
 
     // Verify item availability and calculate total cost
     calculatedTotalCost := 0.0
-	var itemDescriptions []string
+    var itemDescriptions []string
     for _, item := range req.Items {
-        found := false
         for i, product := range storeProducts {
             if product.Product == item.Product {
                 if product.Quantity < item.Quantity {
-                    return c.JSON(http.StatusBadRequest, map[string]string{"message": fmt.Sprintf("Insufficient stock for %s", item.Product)})
+                    return c.JSON(http.StatusBadRequest, map[string]string{
+                        "message": fmt.Sprintf("Insufficient stock for %s", item.Product),
+                    })
                 }
+                // Reduce the quantity and retain the weight
                 storeProducts[i].Quantity -= item.Quantity
+
+                // Add the cost for this item to the total
                 calculatedTotalCost += product.Price * float64(item.Quantity)
-				itemDescriptions = append(itemDescriptions, fmt.Sprintf("%s %dx", item.Product, item.Quantity))
-                found = true
+
+                // Add description for Midtrans payload
+                itemDescriptions = append(itemDescriptions, fmt.Sprintf("%s x%d", product.Product, item.Quantity))
                 break
             }
         }
-        if !found {
-            return c.JSON(http.StatusBadRequest, map[string]string{"message": fmt.Sprintf("Product %s not found in store", item.Product)})
-        }
     }
-
+ 
     if req.PaymentMethod == "Wallet" {
         // Wallet Payment Logic
         var customerBalance float64
@@ -261,6 +264,7 @@ func FacilitatePurchase(c echo.Context) error {
 		// Send the charge request to Midtrans
 		resp, err := coreAPI.ChargeTransaction(request)
 		if err != nil {
+            fmt.Println(err)
 			return c.JSON(http.StatusInternalServerError, map[string]string{"message": "Failed to process online payment"})
 		}
 
@@ -291,13 +295,16 @@ func FacilitatePurchase(c echo.Context) error {
     updatedStoreProductsJSON, _ := json.Marshal(storeProducts)
     updateStoreQuery := "UPDATE stores SET products = $1 WHERE id = $2"
     if _, err := config.Pool.Exec(context.Background(), updateStoreQuery, updatedStoreProductsJSON, storeID); err != nil {
-        return c.JSON(http.StatusInternalServerError, map[string]string{"message": "Failed to update store inventory"})
-    }
+        return c.JSON(http.StatusInternalServerError, map[string]string{
+            "message": "Failed to update store inventory",
+        })
+    } 
 
     // Update customer's inventory
     var customerInventory []struct {
-        Product  string `json:"product"`
-        Quantity int    `json:"quantity"`
+        Product  string     `json:"product"`
+        Quantity int        `json:"quantity"`
+        Weight   float64    `json:"weight"` 
     }
     customerInventoryQuery := "SELECT inventory FROM customers WHERE id = $1"
     var customerInventoryJSON []byte
@@ -311,18 +318,37 @@ func FacilitatePurchase(c echo.Context) error {
         found := false
         for i, inventoryItem := range customerInventory {
             if inventoryItem.Product == item.Product {
-                customerInventory[i].Quantity += item.Quantity
+                // Update existing inventory item
+                for _, product := range storeProducts {
+                    if product.Product == item.Product {
+                        customerInventory[i].Quantity += item.Quantity
+                        customerInventory[i].Weight += float64(item.Quantity) * product.Weight
+                        break
+                    }
+                }
                 found = true
                 break
             }
         }
         if !found {
-            customerInventory = append(customerInventory, struct {
-                Product  string `json:"product"`
-                Quantity int    `json:"quantity"`
-            }{Product: item.Product, Quantity: item.Quantity})
+            // Add a new item to the inventory
+            for _, product := range storeProducts {
+                if product.Product == item.Product {
+                    customerInventory = append(customerInventory, struct {
+                        Product  string  `json:"product"`
+                        Quantity int     `json:"quantity"`
+                        Weight   float64 `json:"weight"`
+                    }{
+                        Product:  item.Product,
+                        Quantity: item.Quantity,
+                        Weight:   float64(item.Quantity) * product.Weight,
+                    })
+                    break
+                }
+            }
         }
     }
+
     updatedCustomerInventoryJSON, _ := json.Marshal(customerInventory)
     updateCustomerInventoryQuery := "UPDATE customers SET inventory = $1 WHERE id = $2"
     if _, err := config.Pool.Exec(context.Background(), updateCustomerInventoryQuery, updatedCustomerInventoryJSON, req.CustomerID); err != nil {
@@ -370,18 +396,32 @@ func RecycleMaterials(c echo.Context) error {
         return c.JSON(http.StatusBadRequest, map[string]string{"message": "Invalid request format"})
     }
 
-    // Fetch vending machine compatibility
+    // Fetch vending machine compatibility and capacity
     var compatiblePlastics []string
-    vendingMachineQuery := `SELECT compatible_plastics FROM vending_machines WHERE store_id = $1`
+    var capacity, currentFill int
+    vendingMachineQuery := `SELECT compatible_plastics, capacity, current_fill FROM vending_machines WHERE store_id = $1 LIMIT 1`
     var plasticsJSON []byte
     ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
     defer cancel()
 
-    if err := config.Pool.QueryRow(ctx, vendingMachineQuery, storeID).Scan(&plasticsJSON); err != nil {
-        return c.JSON(http.StatusInternalServerError, map[string]string{"message": "Failed to fetch vending machine compatibility"})
+    if err := config.Pool.QueryRow(ctx, vendingMachineQuery, storeID).Scan(&plasticsJSON, &capacity, &currentFill); err != nil {
+        return c.JSON(http.StatusInternalServerError, map[string]string{"message": "Failed to fetch vending machine details"})
     }
+
     if err := json.Unmarshal(plasticsJSON, &compatiblePlastics); err != nil {
         return c.JSON(http.StatusInternalServerError, map[string]string{"message": "Failed to parse compatible plastics"})
+    }
+
+    // Check if there is enough capacity in the vending machine
+    totalRequestedItems := 0
+    for _, reqItem := range requestItems {
+        totalRequestedItems += reqItem.Quantity
+    }
+
+    if currentFill+totalRequestedItems > capacity {
+        return c.JSON(http.StatusBadRequest, map[string]string{
+            "message": fmt.Sprintf("Recycling cannot proceed: vending machine capacity exceeded (%d/%d).", currentFill+totalRequestedItems, capacity),
+        })
     }
 
     // Fetch store catalog
@@ -432,7 +472,6 @@ func RecycleMaterials(c echo.Context) error {
         Quantity int    `json:"quantity"`
         Type     string `json:"type"`
     }
-    var totalItems int
     for _, reqItem := range requestItems {
         matched := false
         for i, inventoryItem := range customerInventory {
@@ -457,7 +496,6 @@ func RecycleMaterials(c echo.Context) error {
                             Quantity int    `json:"quantity"`
                             Type     string `json:"type"`
                         }{Product: reqItem.Product, Quantity: reqItem.Quantity, Type: itemType})
-                        totalItems += reqItem.Quantity
                         matched = true
                         break
                     }
@@ -471,29 +509,24 @@ func RecycleMaterials(c echo.Context) error {
         }
     }
 
-    if totalItems == 0 {
-        return c.JSON(http.StatusBadRequest, map[string]string{"message": "No recyclable materials found"})
+    // Update current fill of the vending machine
+    updateVendingMachineQuery := `UPDATE vending_machines SET current_fill = current_fill + $1 WHERE store_id = $2`
+    if _, err := config.Pool.Exec(ctx, updateVendingMachineQuery, totalRequestedItems, storeID); err != nil {
+        return c.JSON(http.StatusInternalServerError, map[string]string{"message": "Failed to update vending machine fill level"})
     }
 
-    // Fetch vendor ID
-    var vendorID string
-    vendorQuery := `SELECT vendor_id FROM vending_machines WHERE store_id = $1 LIMIT 1`
-    if err := config.Pool.QueryRow(ctx, vendorQuery, storeID).Scan(&vendorID); err != nil {
-        return c.JSON(http.StatusInternalServerError, map[string]string{"message": "Failed to fetch vendor ID"})
-    }
-
-    // Log transaction
+    // Log the transaction in the vending_transactions table
     transactionQuery := `
         INSERT INTO vending_transactions 
         (customer_id, store_admin_id, vendor_id, materials, number_of_items, created_at, updated_at, is_processed)
-        VALUES ($1, $2, $3, $4, $5, NOW(), NOW(), FALSE)
+        VALUES ($1, $2, (SELECT vendor_id FROM vending_machines WHERE store_id = $3 LIMIT 1), $4, $5, NOW(), NOW(), FALSE)
     `
     recyclableMaterialsJSON, _ := json.Marshal(recyclableMaterials)
-    if _, err := config.Pool.Exec(ctx, transactionQuery, customerID, adminID, vendorID, recyclableMaterialsJSON, totalItems); err != nil {
+    if _, err := config.Pool.Exec(ctx, transactionQuery, customerID, adminID, storeID, recyclableMaterialsJSON, totalRequestedItems); err != nil {
         return c.JSON(http.StatusInternalServerError, map[string]string{"message": "Failed to log transaction"})
     }
 
-    // Update customer inventory in database
+    // Update customer inventory in the database
     updatedInventoryJSON, _ := json.Marshal(customerInventory)
     updateInventoryQuery := `UPDATE customers SET inventory = $1 WHERE id = $2`
     if _, err := config.Pool.Exec(ctx, updateInventoryQuery, updatedInventoryJSON, customerID); err != nil {
@@ -503,7 +536,9 @@ func RecycleMaterials(c echo.Context) error {
     // Respond with success
     return c.JSON(http.StatusOK, map[string]interface{}{
         "message":             "Materials recycled successfully",
-        "total_items":         totalItems,
+        "total_items":         totalRequestedItems,
         "recyclable_materials": recyclableMaterials,
+        "current_fill":        currentFill + totalRequestedItems,
+        "capacity":            capacity,
     })
 }

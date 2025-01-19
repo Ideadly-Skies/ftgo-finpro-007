@@ -330,15 +330,15 @@ func CheckPurchaseStatus(c echo.Context) error {
 
     orderID := c.Param("order_id") // Extract Order ID from the request URL
 
-	// Check if the transaction has already been processed
-	var isProcessed bool
-	checkProcessedQuery := "SELECT is_processed FROM customer_transactions WHERE order_id = $1"
-	if err := config.Pool.QueryRow(context.Background(), checkProcessedQuery, orderID).Scan(&isProcessed); err != nil {
-		return c.JSON(http.StatusInternalServerError, map[string]string{"message": "Failed to check transaction processing status"})
-	}
-	if isProcessed {
-		return c.JSON(http.StatusConflict, map[string]string{"message": "Transaction has already been processed"})
-	}
+    // Check if the transaction has already been processed
+    var isProcessed bool
+    checkProcessedQuery := "SELECT is_processed FROM customer_transactions WHERE order_id = $1"
+    if err := config.Pool.QueryRow(context.Background(), checkProcessedQuery, orderID).Scan(&isProcessed); err != nil {
+        return c.JSON(http.StatusInternalServerError, map[string]string{"message": "Failed to check transaction processing status"})
+    }
+    if isProcessed {
+        return c.JSON(http.StatusConflict, map[string]string{"message": "Transaction has already been processed"})
+    }
 
     // Fetch transaction status from Midtrans
     resp, err := coreAPI.CheckTransaction(orderID)
@@ -355,72 +355,50 @@ func CheckPurchaseStatus(c echo.Context) error {
 
     // If the transaction is successful, process the purchase
     if resp.TransactionStatus == "settlement" {
-		// Parse purchased items from CustomField1
-		purchasedItems := []struct {
-			Product  string `json:"product"`
-			Quantity int    `json:"quantity"`
-		}{}
-		itemDescription := resp.CustomField1
-		if itemDescription == "" {
-			return c.JSON(http.StatusBadRequest, map[string]string{"message": "Item details missing from transaction"})
-		}
-		items := strings.Split(itemDescription, ", ")
-		fmt.Println("items: ", items) // Debugging log to check the items array
-
-		for _, item := range items {
-			// Find the last space and separate product name and quantity
-			splitIndex := strings.LastIndex(item, " ")
-			if splitIndex == -1 || !strings.HasSuffix(item, "x") {
-				fmt.Printf("Error parsing item: %s\n", item)
-				continue // Skip invalid items
-			}
-
-			product := item[:splitIndex] // Everything before the last space
-			quantityStr := item[splitIndex+1:] // Everything after the last space
-			var quantity int
-			_, err := fmt.Sscanf(quantityStr, "%dx", &quantity) // Parse the quantity with the "x" suffix
-			if err != nil {
-				fmt.Printf("Error parsing quantity from item: %s, error: %v\n", item, err)
-				continue // Skip invalid items
-			}
-
-			purchasedItems = append(purchasedItems, struct {
-				Product  string `json:"product"`
-				Quantity int    `json:"quantity"`
-			}{Product: product, Quantity: quantity})
-		}
-
-		fmt.Println("items: ", items)
-		fmt.Println("purchased items: ", purchasedItems)
-
-        // Fetch the store ID from CustomField2
-        storeID := resp.CustomField2
-        if storeID == "" {
-            return c.JSON(http.StatusBadRequest, map[string]string{"message": "Store ID missing from transaction"})
+        // Parse purchased items from CustomField1
+        purchasedItems := []struct {
+            Product  string `json:"product"`
+            Quantity int    `json:"quantity"`
+        }{}
+        itemDescription := resp.CustomField1
+        if itemDescription == "" {
+            return c.JSON(http.StatusBadRequest, map[string]string{"message": "Item details missing from transaction"})
         }
 
-        // Fetch the customer ID from the customer_transactions table
+        // Parse the items
+        items := strings.Split(itemDescription, ", ")
+        for _, item := range items {
+            splitIndex := strings.LastIndex(item, " x")
+            if splitIndex == -1 {
+                continue // Skip invalid items
+            }
+
+            product := strings.TrimSpace(item[:splitIndex]) // Extract product name
+            var quantity int
+            _, err := fmt.Sscanf(item[splitIndex+2:], "%d", &quantity) // Parse quantity
+            if err != nil {
+                continue
+            }
+
+            purchasedItems = append(purchasedItems, struct {
+                Product  string `json:"product"`
+                Quantity int    `json:"quantity"`
+            }{Product: product, Quantity: quantity})
+        }
+
+        // Fetch the store ID and customer ID
+        storeID := resp.CustomField2
         var customerID string
         fetchCustomerIDQuery := "SELECT customer_id FROM customer_transactions WHERE order_id = $1"
         if err := config.Pool.QueryRow(context.Background(), fetchCustomerIDQuery, orderID).Scan(&customerID); err != nil {
             return c.JSON(http.StatusInternalServerError, map[string]string{"message": "Failed to fetch customer ID"})
         }
 
-        // Log the transaction in the store_transactions table
-        totalAmount := resp.GrossAmount
-        transactionQuery := `
-            INSERT INTO store_transactions (customer_id, store_id, items, total_amount, status, created_at, updated_at)
-            VALUES ($1, $2, $3, $4, 'Completed', NOW(), NOW())
-        `
-        itemsJSON, _ := json.Marshal(purchasedItems)
-        if _, err := config.Pool.Exec(context.Background(), transactionQuery, customerID, storeID, itemsJSON, totalAmount); err != nil {
-            return c.JSON(http.StatusInternalServerError, map[string]string{"message": "Failed to record transaction in store_transactions"})
-        }
-
-        // Update the store inventory
+        // Fetch store inventory
         var storeProducts []struct {
             Product  string  `json:"product"`
             Price    float64 `json:"price"`
+            Weight   float64 `json:"weight"`
             Quantity int     `json:"quantity"`
         }
         fetchStoreInventoryQuery := "SELECT products FROM stores WHERE id = $1"
@@ -432,26 +410,11 @@ func CheckPurchaseStatus(c echo.Context) error {
             return c.JSON(http.StatusInternalServerError, map[string]string{"message": "Failed to parse store inventory"})
         }
 
-        for _, purchasedItem := range purchasedItems {
-            for i, storeProduct := range storeProducts {
-                if storeProduct.Product == purchasedItem.Product {
-                    storeProducts[i].Quantity -= purchasedItem.Quantity
-                    break
-                }
-            }
-        }
-
-        updatedStoreProductsJSON, _ := json.Marshal(storeProducts)
-        updateStoreInventoryQuery := "UPDATE stores SET products = $1 WHERE id = $2"
-        _, execErr := config.Pool.Exec(context.Background(), updateStoreInventoryQuery, updatedStoreProductsJSON, storeID)
-        if execErr != nil {
-            return c.JSON(http.StatusInternalServerError, map[string]string{"message": "Failed to update store inventory"})
-        }
-
-        // Update the customer inventory
+        // Fetch customer inventory
         var customerInventory []struct {
-            Product  string `json:"product"`
-            Quantity int    `json:"quantity"`
+            Product  string  `json:"product"`
+            Quantity int     `json:"quantity"`
+            Weight   float64 `json:"weight"`
         }
         fetchCustomerInventoryQuery := "SELECT inventory FROM customers WHERE id = $1"
         var customerInventoryJSON []byte
@@ -462,33 +425,70 @@ func CheckPurchaseStatus(c echo.Context) error {
             return c.JSON(http.StatusInternalServerError, map[string]string{"message": "Failed to parse customer inventory"})
         }
 
+        // Process the inventory updates
         for _, purchasedItem := range purchasedItems {
+            // Update store inventory
+            for i, storeProduct := range storeProducts {
+                if storeProduct.Product == purchasedItem.Product {
+                    if storeProduct.Quantity < purchasedItem.Quantity {
+                        return c.JSON(http.StatusBadRequest, map[string]string{
+                            "message": fmt.Sprintf("Insufficient stock for %s", storeProduct.Product),
+                        })
+                    }
+                    storeProducts[i].Quantity -= purchasedItem.Quantity
+                    break
+                }
+            }
+
+            // Update customer inventory
             found := false
             for i, inventoryItem := range customerInventory {
                 if inventoryItem.Product == purchasedItem.Product {
-                    customerInventory[i].Quantity += purchasedItem.Quantity
+                    for _, storeProduct := range storeProducts {
+                        if storeProduct.Product == purchasedItem.Product {
+                            customerInventory[i].Quantity += purchasedItem.Quantity
+                            customerInventory[i].Weight += float64(purchasedItem.Quantity) * storeProduct.Weight
+                            break
+                        }
+                    }
                     found = true
                     break
                 }
             }
             if !found {
-                customerInventory = append(customerInventory, struct {
-                    Product  string `json:"product"`
-                    Quantity int    `json:"quantity"`
-                }{Product: purchasedItem.Product, Quantity: purchasedItem.Quantity})
+                for _, storeProduct := range storeProducts {
+                    if storeProduct.Product == purchasedItem.Product {
+                        customerInventory = append(customerInventory, struct {
+                            Product  string  `json:"product"`
+                            Quantity int     `json:"quantity"`
+                            Weight   float64 `json:"weight"`
+                        }{
+                            Product:  purchasedItem.Product,
+                            Quantity: purchasedItem.Quantity,
+                            Weight:   float64(purchasedItem.Quantity) * storeProduct.Weight,
+                        })
+                        break
+                    }
+                }
             }
         }
 
+        // Save updated inventories to the database
+        updatedStoreProductsJSON, _ := json.Marshal(storeProducts)
+        updateStoreInventoryQuery := "UPDATE stores SET products = $1 WHERE id = $2"
+        _, execErr := config.Pool.Exec(context.Background(), updateStoreInventoryQuery, updatedStoreProductsJSON, storeID)
+        if execErr != nil {
+            return c.JSON(http.StatusInternalServerError, map[string]string{"message": "Failed to update store inventory"})
+        }
+
         updatedCustomerInventoryJSON, _ := json.Marshal(customerInventory)
-        updateCustomerInventoryQuery := "UPDATE customers SET inventory = $1 WHERE id = $2"
-        _, dbErr := config.Pool.Exec(context.Background(), updateCustomerInventoryQuery, updatedCustomerInventoryJSON, customerID)
+        _, dbErr := config.Pool.Exec(context.Background(), "UPDATE customers SET inventory = $1 WHERE id = $2", updatedCustomerInventoryJSON, customerID)
         if dbErr != nil {
             return c.JSON(http.StatusInternalServerError, map[string]string{"message": "Failed to update customer inventory"})
         }
 
-		// Mark the transaction as processed
-        markProcessedQuery := "UPDATE customer_transactions SET is_processed = TRUE WHERE order_id = $1"
-        _, dbErr = config.Pool.Exec(context.Background(), markProcessedQuery, orderID)
+        // Mark the transaction as processed
+        _, dbErr = config.Pool.Exec(context.Background(), "UPDATE customer_transactions SET is_processed = TRUE WHERE order_id = $1", orderID)
         if dbErr != nil {
             return c.JSON(http.StatusInternalServerError, map[string]string{"message": "Failed to mark transaction as processed"})
         }

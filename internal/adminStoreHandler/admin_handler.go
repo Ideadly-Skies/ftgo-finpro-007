@@ -176,13 +176,26 @@ func FacilitatePurchase(c echo.Context) error {
         Weight   float64 `json:"weight"` // include weight in here
         Quantity int     `json:"quantity"`
     }
-    storeQuery := "SELECT products FROM stores WHERE id = $1"
-    var storeProductsJSON []byte
-    if err := config.Pool.QueryRow(context.Background(), storeQuery, storeID).Scan(&storeProductsJSON); err != nil {
+    var productTypes []string
+
+    storeQuery := "SELECT products, product_types FROM stores WHERE id = $1"
+    var storeProductsJSON, productTypesJSON []byte
+    if err := config.Pool.QueryRow(context.Background(), storeQuery, storeID).Scan(&storeProductsJSON, &productTypesJSON); err != nil {
         return c.JSON(http.StatusInternalServerError, map[string]string{"message": "Failed to fetch store inventory"})
     }
     if err := json.Unmarshal(storeProductsJSON, &storeProducts); err != nil {
         return c.JSON(http.StatusInternalServerError, map[string]string{"message": "Failed to parse store inventory"})
+    }
+    if err := json.Unmarshal(productTypesJSON, &productTypes); err != nil {
+        return c.JSON(http.StatusInternalServerError, map[string]string{"message": "Failed to parse product types"})
+    }
+
+    // Create a map of product types
+    productTypeMap := make(map[string]string)
+    for i, product := range storeProducts {
+        if i < len(productTypes) {
+            productTypeMap[product.Product] = productTypes[i]
+        }
     }
 
     // Verify item availability and calculate total cost
@@ -304,7 +317,8 @@ func FacilitatePurchase(c echo.Context) error {
     var customerInventory []struct {
         Product  string     `json:"product"`
         Quantity int        `json:"quantity"`
-        Weight   float64    `json:"weight"` 
+        Weight   float64    `json:"weight"`
+        Type     string  `json:"type"` 
     }
     customerInventoryQuery := "SELECT inventory FROM customers WHERE id = $1"
     var customerInventoryJSON []byte
@@ -338,10 +352,12 @@ func FacilitatePurchase(c echo.Context) error {
                         Product  string  `json:"product"`
                         Quantity int     `json:"quantity"`
                         Weight   float64 `json:"weight"`
+                        Type     string  `json:"type"`
                     }{
                         Product:  item.Product,
                         Quantity: item.Quantity,
                         Weight:   float64(item.Quantity) * product.Weight,
+                        Type:     productTypeMap[item.Product],
                     })
                     break
                 }
@@ -396,15 +412,16 @@ func RecycleMaterials(c echo.Context) error {
         return c.JSON(http.StatusBadRequest, map[string]string{"message": "Invalid request format"})
     }
 
-    // Fetch vending machine compatibility and capacity
+    // Fetch vending machine details
     var compatiblePlastics []string
-    var capacity, currentFill int
-    vendingMachineQuery := `SELECT compatible_plastics, capacity, current_fill FROM vending_machines WHERE store_id = $1 LIMIT 1`
+    var weightLimit, currentWeight float64
+    var currentFill int
+    vendingMachineQuery := `SELECT compatible_plastics, weight_limit, current_weight, current_fill FROM vending_machines WHERE store_id = $1 LIMIT 1`
     var plasticsJSON []byte
     ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
     defer cancel()
 
-    if err := config.Pool.QueryRow(ctx, vendingMachineQuery, storeID).Scan(&plasticsJSON, &capacity, &currentFill); err != nil {
+    if err := config.Pool.QueryRow(ctx, vendingMachineQuery, storeID).Scan(&plasticsJSON, &weightLimit, &currentWeight, &currentFill); err != nil {
         return c.JSON(http.StatusInternalServerError, map[string]string{"message": "Failed to fetch vending machine details"})
     }
 
@@ -412,50 +429,16 @@ func RecycleMaterials(c echo.Context) error {
         return c.JSON(http.StatusInternalServerError, map[string]string{"message": "Failed to parse compatible plastics"})
     }
 
-    // Check if there is enough capacity in the vending machine
-    totalRequestedItems := 0
-    for _, reqItem := range requestItems {
-        totalRequestedItems += reqItem.Quantity
-    }
-
-    if currentFill+totalRequestedItems > capacity {
-        return c.JSON(http.StatusBadRequest, map[string]string{
-            "message": fmt.Sprintf("Recycling cannot proceed: vending machine capacity exceeded (%d/%d).", currentFill+totalRequestedItems, capacity),
-        })
-    }
-
-    // Fetch store catalog
-    var productsJSON, productTypesJSON []byte
-    catalogQuery := `SELECT products, product_types FROM stores WHERE id = $1`
-    if err := config.Pool.QueryRow(ctx, catalogQuery, storeID).Scan(&productsJSON, &productTypesJSON); err != nil {
-        return c.JSON(http.StatusInternalServerError, map[string]string{"message": "Failed to fetch store catalog"})
-    }
-
-    var storeProducts []struct {
-        Product  string `json:"product"`
-        Quantity int    `json:"quantity"`
-    }
-    var productTypes []string
-
-    if err := json.Unmarshal(productsJSON, &storeProducts); err != nil {
-        return c.JSON(http.StatusInternalServerError, map[string]string{"message": "Failed to parse products JSON"})
-    }
-    if err := json.Unmarshal(productTypesJSON, &productTypes); err != nil {
-        return c.JSON(http.StatusInternalServerError, map[string]string{"message": "Failed to parse product types JSON"})
-    }
-
-    // Map products to types
-    productTypeMap := make(map[string]string)
-    for i, product := range storeProducts {
-        if i < len(productTypes) {
-            productTypeMap[product.Product] = productTypes[i]
-        }
-    }
+    fmt.Println("weightLimit: ", weightLimit)
+    fmt.Println("currentWeight: ", currentWeight)
+    fmt.Println("currentFill: ", currentFill)
+    fmt.Println("compatible plastics: ", compatiblePlastics) 
 
     // Fetch customer inventory
     var customerInventory []struct {
-        Product  string `json:"product"`
-        Quantity int    `json:"quantity"`
+        Product  string  `json:"product"`
+        Quantity int     `json:"quantity"`
+        Weight   float64 `json:"weight"`
     }
     inventoryQuery := `SELECT inventory FROM customers WHERE id = $1`
     var inventoryJSON []byte
@@ -468,18 +451,25 @@ func RecycleMaterials(c echo.Context) error {
 
     // Process recycling request
     var recyclableMaterials []struct {
-        Product  string `json:"product"`
-        Quantity int    `json:"quantity"`
-        Type     string `json:"type"`
+        Product  string  `json:"product"`
+        Quantity int     `json:"quantity"`
+        Weight   float64 `json:"weight"`
+        Type     string  `json:"type"`
     }
+    totalWeight := 0.0
+    totalItems := 0
+
+    fmt.Println("customer inventory: ", customerInventory)
+
     for _, reqItem := range requestItems {
         matched := false
         for i, inventoryItem := range customerInventory {
             if reqItem.Product == inventoryItem.Product {
-                itemType, exists := productTypeMap[reqItem.Product]
-                if !exists {
+                // Calculate weight for requested quantity
+                itemWeight := float64(reqItem.Quantity) * (inventoryItem.Weight / float64(inventoryItem.Quantity))
+                if currentWeight+itemWeight > weightLimit {
                     return c.JSON(http.StatusBadRequest, map[string]string{
-                        "message": fmt.Sprintf("Product type not found for: %s", reqItem.Product),
+                        "message": fmt.Sprintf("Recycling cannot proceed: weight limit exceeded. Current weight: %.2fkg, Limit: %.2fkg", currentWeight, weightLimit),
                     })
                 }
                 if inventoryItem.Quantity < reqItem.Quantity {
@@ -487,15 +477,29 @@ func RecycleMaterials(c echo.Context) error {
                         "message": fmt.Sprintf("Insufficient quantity for product: %s", reqItem.Product),
                     })
                 }
+
+                // Check compatibility
                 for _, compatible := range compatiblePlastics {
-                    if itemType == compatible {
+                    if reqItem.Product == compatible {
                         // Update customer inventory
                         customerInventory[i].Quantity -= reqItem.Quantity
+                        currentWeight += itemWeight
+                        currentFill += reqItem.Quantity
+
                         recyclableMaterials = append(recyclableMaterials, struct {
-                            Product  string `json:"product"`
-                            Quantity int    `json:"quantity"`
-                            Type     string `json:"type"`
-                        }{Product: reqItem.Product, Quantity: reqItem.Quantity, Type: itemType})
+                            Product  string  `json:"product"`
+                            Quantity int     `json:"quantity"`
+                            Weight   float64 `json:"weight"`
+                            Type     string  `json:"type"`
+                        }{
+                            Product: reqItem.Product, 
+                            Quantity: reqItem.Quantity, 
+                            Weight: itemWeight, 
+                            Type: compatible,
+                        })
+
+                        totalWeight += itemWeight
+                        totalItems += reqItem.Quantity
                         matched = true
                         break
                     }
@@ -509,24 +513,27 @@ func RecycleMaterials(c echo.Context) error {
         }
     }
 
-    // Update current fill of the vending machine
-    updateVendingMachineQuery := `UPDATE vending_machines SET current_fill = current_fill + $1 WHERE store_id = $2`
-    if _, err := config.Pool.Exec(ctx, updateVendingMachineQuery, totalRequestedItems, storeID); err != nil {
-        return c.JSON(http.StatusInternalServerError, map[string]string{"message": "Failed to update vending machine fill level"})
+    // Update vending machine
+    updateVendingMachineQuery := `
+        UPDATE vending_machines 
+        SET current_weight = $1, current_fill = $2, updated_at = NOW() 
+        WHERE store_id = $3`
+    if _, err := config.Pool.Exec(ctx, updateVendingMachineQuery, currentWeight, currentFill, storeID); err != nil {
+        return c.JSON(http.StatusInternalServerError, map[string]string{"message": "Failed to update vending machine"})
     }
 
     // Log the transaction in the vending_transactions table
     transactionQuery := `
         INSERT INTO vending_transactions 
-        (customer_id, store_admin_id, vendor_id, materials, number_of_items, created_at, updated_at, is_processed)
-        VALUES ($1, $2, (SELECT vendor_id FROM vending_machines WHERE store_id = $3 LIMIT 1), $4, $5, NOW(), NOW(), FALSE)
+        (customer_id, store_admin_id, vendor_id, materials, number_of_items, total_weight, created_at, updated_at, is_processed)
+        VALUES ($1, $2, (SELECT vendor_id FROM vending_machines WHERE store_id = $3 LIMIT 1), $4, $5, $6, NOW(), NOW(), FALSE)
     `
     recyclableMaterialsJSON, _ := json.Marshal(recyclableMaterials)
-    if _, err := config.Pool.Exec(ctx, transactionQuery, customerID, adminID, storeID, recyclableMaterialsJSON, totalRequestedItems); err != nil {
+    if _, err := config.Pool.Exec(ctx, transactionQuery, customerID, adminID, storeID, recyclableMaterialsJSON, totalItems, totalWeight); err != nil {
         return c.JSON(http.StatusInternalServerError, map[string]string{"message": "Failed to log transaction"})
     }
 
-    // Update customer inventory in the database
+    // Update customer inventory
     updatedInventoryJSON, _ := json.Marshal(customerInventory)
     updateInventoryQuery := `UPDATE customers SET inventory = $1 WHERE id = $2`
     if _, err := config.Pool.Exec(ctx, updateInventoryQuery, updatedInventoryJSON, customerID); err != nil {
@@ -536,9 +543,11 @@ func RecycleMaterials(c echo.Context) error {
     // Respond with success
     return c.JSON(http.StatusOK, map[string]interface{}{
         "message":             "Materials recycled successfully",
-        "total_items":         totalRequestedItems,
+        "total_items":         totalItems,
+        "total_weight":        totalWeight,
         "recyclable_materials": recyclableMaterials,
-        "current_fill":        currentFill + totalRequestedItems,
-        "capacity":            capacity,
+        "current_fill":        currentFill,
+        "current_weight":      currentWeight,
+        "weight_limit":        weightLimit,
     })
 }

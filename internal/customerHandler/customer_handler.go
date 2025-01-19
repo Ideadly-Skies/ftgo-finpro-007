@@ -401,13 +401,25 @@ func CheckPurchaseStatus(c echo.Context) error {
             Weight   float64 `json:"weight"`
             Quantity int     `json:"quantity"`
         }
-        fetchStoreInventoryQuery := "SELECT products FROM stores WHERE id = $1"
-        var storeProductsJSON []byte
-        if err := config.Pool.QueryRow(context.Background(), fetchStoreInventoryQuery, storeID).Scan(&storeProductsJSON); err != nil {
+        var productTypes []string // product types to update the customer inventory with
+        fetchStoreInventoryQuery := "SELECT products, product_types FROM stores WHERE id = $1"
+        var storeProductsJSON, productTypesJSON []byte
+        if err := config.Pool.QueryRow(context.Background(), fetchStoreInventoryQuery, storeID).Scan(&storeProductsJSON, &productTypesJSON); err != nil {
             return c.JSON(http.StatusInternalServerError, map[string]string{"message": "Failed to fetch store inventory"})
         }
         if err := json.Unmarshal(storeProductsJSON, &storeProducts); err != nil {
             return c.JSON(http.StatusInternalServerError, map[string]string{"message": "Failed to parse store inventory"})
+        }
+        if err := json.Unmarshal(productTypesJSON, &productTypes); err != nil {
+            return c.JSON(http.StatusInternalServerError, map[string]string{"message": "Failed to parse product types"})
+        }
+
+        // Create a productTypeMap to add to the customer's inventory
+        productTypeMap := make(map[string]string)
+        for i, product := range storeProducts {
+            if i < len(productTypes) {
+                productTypeMap[product.Product] = productTypes[i]
+            }
         }
 
         // Fetch customer inventory
@@ -415,6 +427,7 @@ func CheckPurchaseStatus(c echo.Context) error {
             Product  string  `json:"product"`
             Quantity int     `json:"quantity"`
             Weight   float64 `json:"weight"`
+            Type     string  `json:"type"`
         }
         fetchCustomerInventoryQuery := "SELECT inventory FROM customers WHERE id = $1"
         var customerInventoryJSON []byte
@@ -462,10 +475,12 @@ func CheckPurchaseStatus(c echo.Context) error {
                             Product  string  `json:"product"`
                             Quantity int     `json:"quantity"`
                             Weight   float64 `json:"weight"`
+                            Type     string  `json:"type"`
                         }{
                             Product:  purchasedItem.Product,
                             Quantity: purchasedItem.Quantity,
                             Weight:   float64(purchasedItem.Quantity) * storeProduct.Weight,
+                            Type:     productTypeMap[purchasedItem.Product],
                         })
                         break
                     }

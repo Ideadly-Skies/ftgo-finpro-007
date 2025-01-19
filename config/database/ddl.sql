@@ -72,8 +72,9 @@ CREATE TABLE vending_machines (
     store_id UUID REFERENCES stores(id),
     vendor_id UUID REFERENCES vendors(id),
     type VARCHAR(255),
-    capacity INT NOT NULL,
-    current_fill INT DEFAULT 0,
+    weight_limit FLOAT NOT NULL, -- Maximum weight limit in kg
+    current_weight FLOAT DEFAULT 0.0, -- Current weight in kg
+    current_fill INT DEFAULT 0, -- Current number of items
     compatible_plastics JSONB NOT NULL,
     last_maintenance TIMESTAMP,
     next_maintenance_due TIMESTAMP,
@@ -265,9 +266,9 @@ INSERT INTO vendors (name, phone_number, email, password) VALUES
 ('Recycle Pro', '0987654321', 'admin@recyclepro.com', 'prorecycle123');
 
 -- Insert sample vending machines
-INSERT INTO vending_machines (store_id, vendor_id, type, capacity, compatible_plastics) VALUES
-((SELECT id FROM stores LIMIT 1), (SELECT id FROM vendors LIMIT 1), 'Plastic', 500, '["PET", "HDPE"]'),
-((SELECT id FROM stores OFFSET 1 LIMIT 1), (SELECT id FROM vendors OFFSET 1 LIMIT 1), 'Plastic', 600, '["LDPE", "PP"]');
+INSERT INTO vending_machines (store_id, vendor_id, type, weight_limit, compatible_plastics) VALUES
+((SELECT id FROM stores LIMIT 1), (SELECT id FROM vendors LIMIT 1), 'Plastic', 100.0, '["PET", "HDPE"]'),
+((SELECT id FROM stores OFFSET 1 LIMIT 1), (SELECT id FROM vendors OFFSET 1 LIMIT 1), 'Plastic', 150.0, '["LDPE", "PP"]');
 
 -- Insert sample store admins
 INSERT INTO store_admins (store_id, name, email, password) VALUES

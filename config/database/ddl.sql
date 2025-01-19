@@ -66,20 +66,20 @@ CREATE TABLE vendors (
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- Table: Vending Machines
-CREATE TABLE vending_machines (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    store_id UUID REFERENCES stores(id),
-    vendor_id UUID REFERENCES vendors(id),
-    type VARCHAR(255),
-    weight_limit FLOAT NOT NULL, -- Maximum weight limit in kg
-    current_weight FLOAT DEFAULT 0.0, -- Current weight in kg
-    current_fill INT DEFAULT 0, -- Current number of items
-    compatible_plastics JSONB NOT NULL,
-    last_maintenance TIMESTAMP,
-    next_maintenance_due TIMESTAMP,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+-- table: vending machines
+create table vending_machines (
+    id uuid primary key default gen_random_uuid(),
+    store_id uuid references stores(id),
+    vendor_id uuid references vendors(id),
+    type varchar(255),
+    weight_limit float not null, -- maximum weight limit in kg
+    current_weight float default 0.0, -- current weight in kg
+    current_fill int default 0, -- current number of items
+    compatible_plastics jsonb not null,
+    last_maintenance timestamp,
+    next_maintenance_due timestamp,
+    created_at timestamp default current_timestamp,
+    updated_at timestamp default current_timestamp
 );
 
 -- Table: Store Admins
@@ -203,6 +203,7 @@ CREATE TABLE vending_transactions (
     vendor_id UUID REFERENCES vendors(id),
     materials JSONB NOT NULL,
     number_of_items INTEGER DEFAULT 0,
+    total_weight FLOAT DEFAULT 0,
     is_processed BOOLEAN DEFAULT FALSE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP

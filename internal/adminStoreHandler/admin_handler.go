@@ -277,7 +277,6 @@ func FacilitatePurchase(c echo.Context) error {
 		// Send the charge request to Midtrans
 		resp, err := coreAPI.ChargeTransaction(request)
 		if err != nil {
-            fmt.Println(err)
 			return c.JSON(http.StatusInternalServerError, map[string]string{"message": "Failed to process online payment"})
 		}
 
@@ -429,16 +428,12 @@ func RecycleMaterials(c echo.Context) error {
         return c.JSON(http.StatusInternalServerError, map[string]string{"message": "Failed to parse compatible plastics"})
     }
 
-    fmt.Println("weightLimit: ", weightLimit)
-    fmt.Println("currentWeight: ", currentWeight)
-    fmt.Println("currentFill: ", currentFill)
-    fmt.Println("compatible plastics: ", compatiblePlastics) 
-
     // Fetch customer inventory
     var customerInventory []struct {
         Product  string  `json:"product"`
         Quantity int     `json:"quantity"`
         Weight   float64 `json:"weight"`
+        Type     string  `json:"type"`
     }
     inventoryQuery := `SELECT inventory FROM customers WHERE id = $1`
     var inventoryJSON []byte
@@ -459,8 +454,6 @@ func RecycleMaterials(c echo.Context) error {
     totalWeight := 0.0
     totalItems := 0
 
-    fmt.Println("customer inventory: ", customerInventory)
-
     for _, reqItem := range requestItems {
         matched := false
         for i, inventoryItem := range customerInventory {
@@ -480,7 +473,7 @@ func RecycleMaterials(c echo.Context) error {
 
                 // Check compatibility
                 for _, compatible := range compatiblePlastics {
-                    if reqItem.Product == compatible {
+                    if inventoryItem.Type == compatible {
                         // Update customer inventory
                         customerInventory[i].Quantity -= reqItem.Quantity
                         currentWeight += itemWeight

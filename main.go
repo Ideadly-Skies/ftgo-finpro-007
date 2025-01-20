@@ -2,30 +2,30 @@ package main
 
 import (
 	"ftgo-finpro/config/database"
+	admin_handler "ftgo-finpro/internal/adminStoreHandler"
 	customer_handler "ftgo-finpro/internal/customerHandler"
 	cust_middleware "ftgo-finpro/internal/middleware"
-	admin_handler "ftgo-finpro/internal/adminStoreHandler"
 	vendor_handler "ftgo-finpro/internal/vendorHandler"
 
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 )
 
-func main(){
+func main() {
 	// migrate data to supabase
-	// config.MigrateData()
+	//config.MigrateData()
 
 	// connect to db
 	config.InitDB()
 	defer config.CloseDB()
-	
+
 	// use echo-framework to simulate smart-city ecosystem
 	e := echo.New()
-	
+
 	e.Use(middleware.Logger())
 	e.Use(middleware.Recover())
-	
-	// public routes 
+
+	// public routes
 	e.POST("/customer/register", customer_handler.RegisterCustomer)
 	e.POST("/customer/login", customer_handler.LoginCustomer)
 
@@ -52,9 +52,9 @@ func main(){
 	// facilitate purchase & recycling for customer
 	storeAdminGroup.POST("/purchase", admin_handler.FacilitatePurchase)
 	storeAdminGroup.POST("/recycle/:customer_id", admin_handler.RecycleMaterials)
-		
+
 	// protected routes for vendor admin using JWT middleware
-	vendorAdminGroup := e.Group("/vendor-admin")	
+	vendorAdminGroup := e.Group("/vendor-admin")
 	vendorAdminGroup.Use(cust_middleware.JWTMiddleware)
 
 	vendorAdminGroup.GET("/transactions", vendor_handler.GetTransactions)

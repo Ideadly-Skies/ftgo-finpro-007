@@ -149,3 +149,51 @@ func SendEmailNotification(email, name string) error {
 	log.Printf("Email sent successfully! Response: %v", resp)
 	return nil
 }
+
+func SendEmailVerifNotification(email string) error {
+	// Get Brevo API Key from environment
+	apiKey := os.Getenv("BREVO_API_KEY")
+	if apiKey == "" {
+		return errors.New("brevo API Key not found in environment")
+	}
+
+	// Set up Brevo API client
+	cfg := brevo.NewConfiguration()
+	cfg.AddDefaultHeader("api-key", apiKey)
+	client := brevo.NewAPIClient(cfg)
+
+	// Read HTML content from file
+	htmlFilePath, err := os.ReadFile("utils/html/verify.html")
+	if err != nil {
+		log.Printf("Error reading HTML file: %v", err)
+		return err
+	}
+
+	// Create Brevo email struct
+	sender := &brevo.SendSmtpEmailSender{
+		Name:  "PlasCash Team",
+		Email: "bot.plascash@outlook.com",
+	}
+
+	to := []brevo.SendSmtpEmailTo{
+		{Email: email},
+	}
+
+	// Create the email with HTML content
+	emailRequest := &brevo.SendSmtpEmail{
+		Sender:      sender,
+		To:          to,
+		Subject:     "Hello",
+		HtmlContent: string(htmlFilePath),
+	}
+
+	// Send email using Brevo API
+	_, resp, err := client.TransactionalEmailsApi.SendTransacEmail(nil, *emailRequest)
+	if err != nil {
+		log.Printf("Error while sending email: %v", err)
+		return err
+	}
+
+	log.Printf("Email sent successfully! Response: %v", resp)
+	return nil
+}

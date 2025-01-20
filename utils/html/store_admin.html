@@ -12,9 +12,9 @@
         .img-banner {
             display: block;
             width: 100%;
-            max-width: 500px;
             height: auto;
             margin: 0 auto;
+            max-width: none;
         }
         a {
             color: #000000;
@@ -39,7 +39,7 @@
 </head>
 <body>
 <div class="container">
-    <img src="https://media-hosting.imagekit.io//7cb1bdf48af24391/Screenshot%202025-01-19%20140412.png?Expires=1831883309&Key-Pair-Id=K2ZIVPTIP2VGHC&Signature=idnzlq8rnHNlnQ4tUsyoLxXWxo53dCM3EAVlnVnE55ZFFo-EENZwEqA9NPXke-okMg1-jo6Iq~NBJYARSvawbxYpoMufWi0wsNYHKbDocj0VucmqZz71KhUu~TbDfI15okyRXPxN7kQwQDZssF0vNqPEiEp0bibpbVchssRZM6tWDbrBS3Whiq1pfOhwymJsplUhISVynPjBY6sKr0eQ0JWQpzWzrI550PV6-Z1ssZPd1z6dA--YcD-UVIKGmrnZxSRx-3e5J7y9iiKEjv-Ns~AUP5mOQi~oybeNQ7JO0fpGz-kFsZGRPiA-h5deL2objEOo~b5pwK3GW5LeCSc6dQ__" alt="Welcome Banner" class="img-banner"/>
+    <img src="https://media-hosting.imagekit.io//1e1adfc8644642c5/Screenshot%202025-01-19%201404123.PNG?Expires=1831951956&Key-Pair-Id=K2ZIVPTIP2VGHC&Signature=lGqljOBj5jv0-R5We0oRCsfKF~ZAZbPBMNIjaLr0A-GAUnhw2hrWWiJPHvN5fOaq8bFBPCB0osvqE2of5Fql6F-JlIljRuZEoEies1HXX7ka7nmoJ6e4Nf6bedOudkXplF3CYxup5eBSP-iWIP2MNt18aOiics2NHxcRwN1AwSgy~TGANMC4CWnw-g4Bvv3tffJasbR8aHVroZEVliYpzsEAIVQnKHrbIpNXLasz4wRAUqGiIuC7biP5ahfntYjSiAL0IJLqZ35XvkNpIEFCixDNvg8w6uiiSR2QvNYVdgspB6J0RBsKsNn8A3d55WLgZtofuY6nWuGhzIEthq73Ww__" alt="PlasCash Logo" class="img-banner"/>
 
     <div class="email-body">
         <p>Dear Store Admin,</p>
@@ -47,7 +47,8 @@
         <div class="customer-details">
             <p><strong>Customer Details:</strong></p>
             <ul>
-                <li><strong>Username:</strong> [Customer Name]</li>
+                <li><strong>Name:</strong> {{.Name}}</li>
+                <li><strong>Email:</strong> {{.Email}}</li>
             </ul>
         </div>
         <p>To complete the verification process, please click the button below:</p>

@@ -1,3 +1,8 @@
-# Ignore environment files
+# Environment variables
 .env
-.idea
+
+# Docker configuration
+docker-compose.yml
+Dockerfile.client
+Dockerfile.server
+Dockerfile

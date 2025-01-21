@@ -1,4 +1,4 @@
-package handler 
+package handler
 
 import (
 	"context"
@@ -107,6 +107,7 @@ func RegisterCustomer(c echo.Context) error {
 	if err := utils.SendRegisterNotification(req.Email, req.Name); err != nil {
 		log.Printf("Failed to send email: %v", err)
 	}
+
 	return c.JSON(http.StatusOK, map[string]interface{}{
 		"message": fmt.Sprintf("Customer %s registered successfully", req.Name),
 		"email":   req.Email,
@@ -519,7 +520,7 @@ func CheckPurchaseStatus(c echo.Context) error {
 		`
 		purchasedItemsJSON, _ := json.Marshal(purchasedItems)
 		if _, err := config.Pool.Exec(context.Background(), transactionQuery, customerID, storeID, purchasedItemsJSON, resp.GrossAmount); err != nil {
-		return c.JSON(http.StatusInternalServerError, map[string]string{"message": "Failed to record transaction"})
+			return c.JSON(http.StatusInternalServerError, map[string]string{"message": "Failed to record transaction"})
 		}
 	}
 
@@ -534,59 +535,59 @@ func CheckPurchaseStatus(c echo.Context) error {
 }
 
 func GetCustomerTokens(c echo.Context) error {
-    // Extract customer ID from JWT claims
-    user := c.Get("user").(*jwt.Token)
-    claims := user.Claims.(jwt.MapClaims)
-    customerID, ok := claims["customer_id"].(string)
-    if !ok || customerID == "" {
-        return c.JSON(http.StatusUnauthorized, map[string]string{
-            "message": "Unauthorized: Missing or invalid customer ID",
-        })
-    }
+	// Extract customer ID from JWT claims
+	user := c.Get("user").(*jwt.Token)
+	claims := user.Claims.(jwt.MapClaims)
+	customerID, ok := claims["customer_id"].(string)
+	if !ok || customerID == "" {
+		return c.JSON(http.StatusUnauthorized, map[string]string{
+			"message": "Unauthorized: Missing or invalid customer ID",
+		})
+	}
 
-    // Query to fetch all tokens for the logged-in customer
-    query := `
+	// Query to fetch all tokens for the logged-in customer
+	query := `
         SELECT id, vendor_id, token, issued_at, is_redeemed
         FROM customer_tokens
         WHERE customer_id = $1
         ORDER BY issued_at DESC
     `
-    rows, err := config.Pool.Query(context.Background(), query, customerID)
-    if err != nil {
-        return c.JSON(http.StatusInternalServerError, map[string]string{
-            "message": "Failed to fetch customer tokens",
-        })
-    }
-    defer rows.Close()
+	rows, err := config.Pool.Query(context.Background(), query, customerID)
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]string{
+			"message": "Failed to fetch customer tokens",
+		})
+	}
+	defer rows.Close()
 
-    // Collect tokens into a slice
-    var tokens []struct {
-        ID         string    `json:"id"`
-        VendorID   string    `json:"vendor_id"`
-        Token      string    `json:"token"`
-        IssuedAt   time.Time `json:"issued_at"`
-        IsRedeemed bool      `json:"is_redeemed"`
-    }
+	// Collect tokens into a slice
+	var tokens []struct {
+		ID         string    `json:"id"`
+		VendorID   string    `json:"vendor_id"`
+		Token      string    `json:"token"`
+		IssuedAt   time.Time `json:"issued_at"`
+		IsRedeemed bool      `json:"is_redeemed"`
+	}
 
-    for rows.Next() {
-        var token struct {
-            ID         string    `json:"id"`
-            VendorID   string    `json:"vendor_id"`
-            Token      string    `json:"token"`
-            IssuedAt   time.Time `json:"issued_at"`
-            IsRedeemed bool      `json:"is_redeemed"`
-        }
-        if err := rows.Scan(&token.ID, &token.VendorID, &token.Token, &token.IssuedAt, &token.IsRedeemed); err != nil {
-            return c.JSON(http.StatusInternalServerError, map[string]string{
-                "message": "Failed to parse tokens",
-            })
-        }
-        tokens = append(tokens, token)
-    }
+	for rows.Next() {
+		var token struct {
+			ID         string    `json:"id"`
+			VendorID   string    `json:"vendor_id"`
+			Token      string    `json:"token"`
+			IssuedAt   time.Time `json:"issued_at"`
+			IsRedeemed bool      `json:"is_redeemed"`
+		}
+		if err := rows.Scan(&token.ID, &token.VendorID, &token.Token, &token.IssuedAt, &token.IsRedeemed); err != nil {
+			return c.JSON(http.StatusInternalServerError, map[string]string{
+				"message": "Failed to parse tokens",
+			})
+		}
+		tokens = append(tokens, token)
+	}
 
-    // Return tokens in JSON format
-    return c.JSON(http.StatusOK, map[string]interface{}{
-        "message": "Customer tokens fetched successfully",
-        "tokens":  tokens,
-    })
+	// Return tokens in JSON format
+	return c.JSON(http.StatusOK, map[string]interface{}{
+		"message": "Customer tokens fetched successfully",
+		"tokens":  tokens,
+	})
 }

@@ -2,8 +2,18 @@
 <head>
     <style>
 
-        body { font-family: Arial, sans-serif; margin: 0; padding: 0; background-color: #f4f4f4; color: #333;}
-        .container { width: 100%; max-width: 600px; margin: 0 auto; background-color: #fff; padding: 20px; }
+        body { font-family: Arial, sans-serif; margin: 0; padding: 0; background-color: #f4f4f4; color: #333; text-align: center;}
+
+        .container {
+            width: 100%;
+            max-width: 600px;
+            margin: 0 auto;
+            background-color: #fff;
+            padding: 20px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+            border-radius: 10px;
+        }
+
         .footer { background-color: #f2f2f2; padding: 10px 0; text-align: center;}
         h1 { color: #333; font-size: 24px; }
         p { color: #555; font-size: 16px; }
@@ -34,6 +44,15 @@
         .verify-button:hover {
             background-color: #3867d6;
         }
+        h1 {
+            font-size: 24px;
+            color: #4caf50;
+            margin-bottom: 10px;
+        }
+        p {
+            font-size: 16px;
+            color: #555;
+        }
 
     </style>
 </head>
@@ -42,25 +61,9 @@
     <img src="https://media-hosting.imagekit.io//1e1adfc8644642c5/Screenshot%202025-01-19%201404123.PNG?Expires=1831951956&Key-Pair-Id=K2ZIVPTIP2VGHC&Signature=lGqljOBj5jv0-R5We0oRCsfKF~ZAZbPBMNIjaLr0A-GAUnhw2hrWWiJPHvN5fOaq8bFBPCB0osvqE2of5Fql6F-JlIljRuZEoEies1HXX7ka7nmoJ6e4Nf6bedOudkXplF3CYxup5eBSP-iWIP2MNt18aOiics2NHxcRwN1AwSgy~TGANMC4CWnw-g4Bvv3tffJasbR8aHVroZEVliYpzsEAIVQnKHrbIpNXLasz4wRAUqGiIuC7biP5ahfntYjSiAL0IJLqZ35XvkNpIEFCixDNvg8w6uiiSR2QvNYVdgspB6J0RBsKsNn8A3d55WLgZtofuY6nWuGhzIEthq73Ww__" alt="PlasCash Logo" class="img-banner"/>
 
     <div class="email-body">
-        <p>Dear Store Admin,</p>
-        <p>You have a new customer registration that requires verification. Please review the details below:</p>
-        <div class="customer-details">
-            <p><strong>Customer Details:</strong></p>
-            <ul>
-                <li><strong>Name:</strong> {{.Name}}</li>
-                <li><strong>Email:</strong> {{.Email}}</li>
-            </ul>
-        </div>
-        <p>To complete the verification process, please click the button below:</p>
-
-        <div style="text-align: center; color: #ffffff;">
-            <a href="/store-admin/customers-verify" class="verify-button">VERIFY NOW</a>
-        </div>
-
-        <p>If you have any questions or need further assistance, feel free to reach out to our support team.</p>
-        <p>Best regards,<br>
-            <strong>[PlasCash - Indonesia]</strong><br>
-            Admin Team</p>
+        <br>
+        <h1>Verification Successful!</h1>
+        <p>Congratulations! You now have access to vending machines across our partnered locations.</p>
         <br>
 
         <div class="footer">

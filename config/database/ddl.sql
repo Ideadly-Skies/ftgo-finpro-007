@@ -179,25 +179,6 @@ CREATE TABLE factory_vendor_requests (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- Table: Gojek Drivers (Simulated)
-CREATE TABLE gojek_drivers (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    name VARCHAR(255) NOT NULL,
-    phone_number VARCHAR(15) NOT NULL,
-    vehicle_details JSONB NOT NULL,
-    jwt_token TEXT, -- Added JWT Token
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
--- Table: Gojek Transactions (Simulated)
-CREATE TABLE gojek_transactions (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    customer_id UUID REFERENCES customers(id),
-    driver_id UUID REFERENCES gojek_drivers(id),
-    total_amount DECIMAL(10, 2) NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
 CREATE TABLE vending_transactions (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     customer_id UUID REFERENCES customers(id),

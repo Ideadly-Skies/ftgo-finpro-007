@@ -45,6 +45,7 @@ func main() {
 	customerGroup.GET("/wallet/withdraw/status/:order_id", customer_handler.CheckWithdrawalStatus)
 	customerGroup.GET("/transaction/status/:order_id", customer_handler.CheckPurchaseStatus)
 	customerGroup.POST("/request-verify", customer_handler.RequestVerify)
+	customerGroup.POST("/delivery", customer_handler.CalculateDistanceAndPrice)
 
 	// protected routes for store admin using JWT middleware
 	storeAdminGroup := e.Group("/store-admin")
@@ -53,7 +54,7 @@ func main() {
 	// facilitate purchase & recycling for customer
 	storeAdminGroup.POST("/purchase", admin_handler.FacilitatePurchase)
 	storeAdminGroup.POST("/recycle/:customer_id", admin_handler.RecycleMaterials)
-	storeAdminGroup.POST("/customers-verify", admin_handler.VerifyCustomer)
+	storeAdminGroup.POST("/customer-verify", admin_handler.VerifyCustomer)
 
 	// protected routes for vendor admin using JWT middleware
 	vendorAdminGroup := e.Group("/vendor-admin")

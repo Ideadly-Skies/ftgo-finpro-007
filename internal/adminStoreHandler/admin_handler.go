@@ -1,4 +1,4 @@
-package Handler
+package handler
 
 import (
 	"context"
@@ -201,6 +201,31 @@ func FacilitatePurchase(c echo.Context) error {
     // Verify item availability and calculate total cost
     calculatedTotalCost := 0.0
     var itemDescriptions []string
+
+    // Create a set of valid products for validation
+    validProducts := make(map[string]bool)
+    for _, product := range storeProducts {
+        validProducts[product.Product] = true
+    }
+
+    // Check if all requested products are valid
+    for _, item := range req.Items {
+        if !validProducts[item.Product] {
+            return c.JSON(http.StatusBadRequest, map[string]string{
+                "message": fmt.Sprintf("Invalid product: %s", item.Product),
+            })
+        }
+    }
+
+    // Validate item quantities
+    for _, item := range req.Items {
+        if item.Quantity <= 0 {
+            return c.JSON(http.StatusBadRequest, map[string]string{
+                "message": fmt.Sprintf("Invalid quantity for product: %s. Quantity must be greater than 0", item.Product),
+            })
+        }
+    }
+
     for _, item := range req.Items {
         for i, product := range storeProducts {
             if product.Product == item.Product {
@@ -412,15 +437,16 @@ func RecycleMaterials(c echo.Context) error {
     }
 
     // Fetch vending machine details
+    var vendingMachineID string
     var compatiblePlastics []string
     var weightLimit, currentWeight float64
     var currentFill int
-    vendingMachineQuery := `SELECT compatible_plastics, weight_limit, current_weight, current_fill FROM vending_machines WHERE store_id = $1 LIMIT 1`
+    vendingMachineQuery := `SELECT id, compatible_plastics, weight_limit, current_weight, current_fill FROM vending_machines WHERE store_id = $1 LIMIT 1`
     var plasticsJSON []byte
     ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
     defer cancel()
 
-    if err := config.Pool.QueryRow(ctx, vendingMachineQuery, storeID).Scan(&plasticsJSON, &weightLimit, &currentWeight, &currentFill); err != nil {
+    if err := config.Pool.QueryRow(ctx, vendingMachineQuery, storeID).Scan(&vendingMachineID, &plasticsJSON, &weightLimit, &currentWeight, &currentFill); err != nil {
         return c.JSON(http.StatusInternalServerError, map[string]string{"message": "Failed to fetch vending machine details"})
     }
 
@@ -518,11 +544,11 @@ func RecycleMaterials(c echo.Context) error {
     // Log the transaction in the vending_transactions table
     transactionQuery := `
         INSERT INTO vending_transactions 
-        (customer_id, store_admin_id, vendor_id, materials, number_of_items, total_weight, created_at, updated_at, is_processed)
-        VALUES ($1, $2, (SELECT vendor_id FROM vending_machines WHERE store_id = $3 LIMIT 1), $4, $5, $6, NOW(), NOW(), FALSE)
+        (customer_id, store_admin_id, vendor_id, vending_machine_id, materials, number_of_items, total_weight, created_at, updated_at, is_processed)
+        VALUES ($1, $2, (SELECT vendor_id FROM vending_machines WHERE id = $3 LIMIT 1), $3, $4, $5, $6, NOW(), NOW(), FALSE)
     `
     recyclableMaterialsJSON, _ := json.Marshal(recyclableMaterials)
-    if _, err := config.Pool.Exec(ctx, transactionQuery, customerID, adminID, storeID, recyclableMaterialsJSON, totalItems, totalWeight); err != nil {
+    if _, err := config.Pool.Exec(ctx, transactionQuery, customerID, adminID, vendingMachineID, recyclableMaterialsJSON, totalItems, totalWeight); err != nil {
         return c.JSON(http.StatusInternalServerError, map[string]string{"message": "Failed to log transaction"})
     }
 
@@ -543,4 +569,97 @@ func RecycleMaterials(c echo.Context) error {
         "current_weight":      currentWeight,
         "weight_limit":        weightLimit,
     })
+}
+
+// decode the token from the vendor into the customer's wallet
+var secretKey = []byte("vendor_customer_secret_key")
+func DecodeToken(tokenString string) (map[string]interface{}, error) {
+	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
+		return secretKey, nil
+	})
+	if err != nil {
+		return nil, fmt.Errorf("invalid token")
+	}
+
+	// Verify token validity
+	if claims, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
+		return claims, nil
+	}
+
+	return nil, fmt.Errorf("invalid or expired token")
+}
+
+// redeem token for the user
+func RedeemToken(c echo.Context) error {
+	// Get customer ID from URL parameters
+	customerID := c.Param("customer_id")
+	if customerID == "" {
+		return c.JSON(http.StatusBadRequest, map[string]string{"message": "Customer ID is required"})
+	}
+
+	// Bind the request to get the token
+	var req struct {
+		Token string `json:"token" validate:"required"`
+	}
+	if err := c.Bind(&req); err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{"message": "Invalid request payload"})
+	}
+
+	// Decode the token
+	claims, err := DecodeToken(req.Token)
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{"message": "Invalid or expired token"})
+	}
+
+	// Extract amount from token claims
+	amount, ok := claims["amount"].(float64)
+	if !ok {
+		return c.JSON(http.StatusBadRequest, map[string]string{"message": "Invalid token: missing amount"})
+	}
+
+	// Validate the token belongs to the customer
+	tokenCustomerID, ok := claims["customer_id"].(string)
+	if !ok || tokenCustomerID != customerID {
+		return c.JSON(http.StatusUnauthorized, map[string]string{"message": "Token does not belong to this customer"})
+	}
+
+	// Check if the token has already been redeemed
+	var isRedeemed bool
+	checkTokenQuery := "SELECT is_redeemed FROM customer_tokens WHERE token = $1 AND customer_id = $2"
+	err = config.Pool.QueryRow(context.Background(), checkTokenQuery, req.Token, customerID).Scan(&isRedeemed)
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{"message": "Token not found"})
+	}
+	if isRedeemed {
+		return c.JSON(http.StatusBadRequest, map[string]string{"message": "Token has already been redeemed"})
+	}
+
+	// Add the amount to the customer's wallet
+	updateWalletQuery := `
+		UPDATE customers 
+		SET wallet_balance = wallet_balance + $1, updated_at = NOW()
+		WHERE id = $2
+	`
+	_, err = config.Pool.Exec(context.Background(), updateWalletQuery, amount, customerID)
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]string{"message": "Failed to update wallet balance"})
+	}
+
+	// Mark the token as redeemed
+	updateTokenQuery := `
+		UPDATE customer_tokens 
+		SET is_redeemed = TRUE
+		WHERE token = $1 AND customer_id = $2
+	`
+	_, err = config.Pool.Exec(context.Background(), updateTokenQuery, req.Token, customerID)
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]string{"message": "Failed to update token status"})
+	}
+
+	// Return success response
+	return c.JSON(http.StatusOK, map[string]interface{}{
+		"message":       "Token redeemed successfully",
+		"redeemed_amount": amount,
+		"customer_id":   customerID,
+	})
 }

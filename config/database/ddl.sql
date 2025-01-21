@@ -4,7 +4,7 @@ DROP TABLE IF EXISTS gojek_transactions CASCADE;
 DROP TABLE IF EXISTS factory_vendor_requests CASCADE;
 DROP TABLE IF EXISTS factories CASCADE;
 DROP TABLE IF EXISTS vendor_customer_report CASCADE;
-DROP TABLE IF EXISTS tokens CASCADE;
+DROP TABLE IF EXISTS customer_tokens CASCADE;
 DROP TABLE IF EXISTS customer_transactions CASCADE;
 DROP TABLE IF EXISTS store_transactions CASCADE;
 DROP TABLE IF EXISTS factory_admins CASCADE;
@@ -17,7 +17,6 @@ DROP TABLE IF EXISTS suppliers CASCADE;
 DROP TABLE IF EXISTS customers CASCADE;
 DROP TABLE IF EXISTS vending_transactions CASCADE;
 DROP TABLE IF EXISTS plastics_pricing CASCADE;
-DROP TABLE IF EXISTS factory_customer_report CASCADE;
 
 -- Table: Customers
 CREATE TABLE customers (
@@ -131,13 +130,14 @@ CREATE TABLE store_transactions (
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- Table: Tokens
-CREATE TABLE tokens (
+-- Table: Customer Tokens
+CREATE TABLE customer_tokens (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     customer_id UUID REFERENCES customers(id),
     vendor_id UUID REFERENCES vendors(id),
-    amount DECIMAL(10, 2) NOT NULL,
-    issued_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    token TEXT NOT NULL, -- The token string encoding the transaction amount
+    issued_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    is_redeemed BOOLEAN DEFAULT FALSE -- Tracks whether the token has been redeemed
 );
 
 -- Table: Reports
@@ -201,6 +201,7 @@ CREATE TABLE vending_transactions (
     customer_id UUID REFERENCES customers(id),
     store_admin_id UUID REFERENCES store_admins(id),
     vendor_id UUID REFERENCES vendors(id),
+    vending_machine_id UUID REFERENCES vending_machines(id),
     materials JSONB NOT NULL,
     number_of_items INTEGER DEFAULT 0,
     total_weight FLOAT DEFAULT 0,
@@ -212,20 +213,10 @@ CREATE TABLE vending_transactions (
 CREATE TABLE plastics_pricing (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     type VARCHAR(50) NOT NULL UNIQUE, -- e.g., PET, HDPE, LDPE
-    price_per_kg DECIMAL(10, 2) NOT NULL, -- Price in the currency
+    price_per_kg_factory DECIMAL(10, 2) NOT NULL, -- Factory selling price per kilogram
+    price_per_kg_customer DECIMAL(10, 2) NOT NULL, -- Customer selling price per kilogram
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
-CREATE TABLE factory_customer_report (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    customer_id UUID REFERENCES customers(id),
-    store_admin_id UUID REFERENCES store_admins(id),
-    plastic_type VARCHAR(50) REFERENCES plastics_pricing(type),
-    quantity DECIMAL(10, 2) NOT NULL, -- Quantity in kilograms
-    total_price DECIMAL(10, 2) NOT NULL, -- Total price for the plastic type
-    vendor_customer_report_id UUID REFERENCES vendor_customer_report(id), -- Link to vendor report
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 -- DML Queries: Sample Data Population
@@ -239,7 +230,6 @@ INSERT INTO suppliers (name, contact_info) VALUES
 ('Global Plastics', '{"email": "supply@globalplastics.com", "phone": "123456789"}'),
 ('Eco Materials Inc.', '{"email": "contact@ecomaterials.com", "phone": "987654321"}');
 
--- Insert sample stores
 -- Insert sample stores with weights added to products
 INSERT INTO stores (name, products, product_types, supplier_id) VALUES
 (
@@ -283,3 +273,10 @@ INSERT INTO vendor_admins (vendor_id, name, email, password) VALUES
 -- Insert sample factory admins
 INSERT INTO factory_admins (factory_id, name, email, password) VALUES
 ((SELECT id FROM factories LIMIT 1), 'Factory Admin Dave', 'admin.dave@factory.com', 'factorypass123');
+
+-- Plastics pricing seed
+INSERT INTO plastics_pricing (type, price_per_kg_factory, price_per_kg_customer) VALUES
+('PET', 11000.00, 9350.00), -- Factory price: 11,000, Customer price: 15% less (11,000 * 0.85)
+('HDPE', 11000.00, 9350.00), -- Factory price: 11,000, Customer price: 15% less
+('LDPE', 10500.00, 8925.00), -- Factory price: 10,500, Customer price: 15% less (10,500 * 0.85)
+('PP', 10500.00, 8925.00); -- Factory price: 10,500, Customer price: 15% less

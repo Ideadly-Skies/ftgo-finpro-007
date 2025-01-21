@@ -13,7 +13,7 @@ import (
 
 func main() {
 	// migrate data to supabase
-	//config.MigrateData()
+	// config.MigrateData()
 
 	// connect to db
 	config.InitDB()
@@ -44,6 +44,7 @@ func main() {
 	customerGroup.POST("/wallet/withdraw", customer_handler.WithdrawMoney)
 	customerGroup.GET("/wallet/withdraw/status/:order_id", customer_handler.CheckWithdrawalStatus)
 	customerGroup.GET("/transaction/status/:order_id", customer_handler.CheckPurchaseStatus)
+	customerGroup.GET("/get-tokens", customer_handler.GetCustomerTokens)
 
 	// protected routes for store admin using JWT middleware
 	storeAdminGroup := e.Group("/store-admin")
@@ -52,12 +53,14 @@ func main() {
 	// facilitate purchase & recycling for customer
 	storeAdminGroup.POST("/purchase", admin_handler.FacilitatePurchase)
 	storeAdminGroup.POST("/recycle/:customer_id", admin_handler.RecycleMaterials)
+	storeAdminGroup.POST("/redeem-token/:customer_id", admin_handler.RedeemToken)
 
 	// protected routes for vendor admin using JWT middleware
 	vendorAdminGroup := e.Group("/vendor-admin")
 	vendorAdminGroup.Use(cust_middleware.JWTMiddleware)
 
 	vendorAdminGroup.GET("/transactions", vendor_handler.GetTransactions)
+	vendorAdminGroup.POST("/recycle/:transaction_id", vendor_handler.FacilitateCustomerRecycle)
 
 	// start the server at 8080
 	e.Logger.Fatal(e.Start(":8080"))

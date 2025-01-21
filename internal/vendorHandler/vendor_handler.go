@@ -1,10 +1,11 @@
-package Handler
+package handler 
 
 import (
 	"context"
 	"fmt"
 	"net/http"
 	"time"
+	"encoding/json"
 
 	config "ftgo-finpro/config/database"
 
@@ -200,4 +201,150 @@ func GetTransactions(c echo.Context) error {
 		"message":      "Transactions fetched successfully",
 		"transactions": transactions,
 	})
+}
+
+// facilitate customer token generation
+var secretKey = []byte("vendor_customer_secret_key")
+func GenerateToken(customerID, vendorID string, amount float64) (string, error) {
+	claims := jwt.MapClaims{
+		"customer_id": customerID,
+		"vendor_id":   vendorID,
+		"amount":      amount,
+		"issued_at":   time.Now().Unix(),
+	}
+
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	return token.SignedString(secretKey)
+}
+
+func FacilitateCustomerRecycle(c echo.Context) error {
+    // Authenticate and extract vendor admin claims
+    user := c.Get("user").(*jwt.Token)
+    claims := user.Claims.(jwt.MapClaims)
+    vendorID, ok := claims["vendor_id"].(string)
+    if !ok || vendorID == "" {
+        return c.JSON(http.StatusUnauthorized, map[string]string{"message": "Unauthorized: Invalid vendor ID"})
+    }
+
+    // Get transaction ID from URL parameters
+    transactionID := c.Param("transaction_id")
+    if transactionID == "" {
+        return c.JSON(http.StatusBadRequest, map[string]string{"message": "Transaction ID is required"})
+    }
+
+    // Fetch the transaction details
+    var transaction Transaction
+    query := `
+        SELECT id, customer_id, vendor_id, materials, number_of_items, is_processed
+        FROM vending_transactions
+        WHERE id = $1 AND vendor_id = $2
+    `
+    err := config.Pool.QueryRow(context.Background(), query, transactionID, vendorID).Scan(
+        &transaction.ID,
+        &transaction.CustomerID,
+        &transaction.VendorID,
+        &transaction.Materials,
+        &transaction.NumberOfItems,
+        &transaction.IsProcessed,
+    )
+    if err != nil {
+        return c.JSON(http.StatusBadRequest, map[string]string{"message": "Invalid or unauthorized transaction"})
+    }
+
+    // Check if the transaction is already processed
+    if transaction.IsProcessed {
+        return c.JSON(http.StatusBadRequest, map[string]string{"message": "Transaction already processed"})
+    }
+
+    // Parse materials from the transaction
+    var materials []struct {
+        Type     string  `json:"type"`
+        Weight   float64 `json:"weight"`
+        Product  string  `json:"product"`
+        Quantity int     `json:"quantity"`
+    }
+    if err := json.Unmarshal([]byte(transaction.Materials), &materials); err != nil {
+        return c.JSON(http.StatusInternalServerError, map[string]string{"message": "Failed to parse transaction materials"})
+    }
+
+    // Fetch pricing details
+    pricingQuery := `SELECT type, price_per_kg_customer FROM plastics_pricing`
+    rows, err := config.Pool.Query(context.Background(), pricingQuery)
+    if err != nil {
+        return c.JSON(http.StatusInternalServerError, map[string]string{"message": "Failed to fetch plastics pricing"})
+    }
+    defer rows.Close()
+
+    pricing := make(map[string]float64)
+    for rows.Next() {
+        var materialType string
+        var pricePerKg float64
+        if err := rows.Scan(&materialType, &pricePerKg); err != nil {
+            return c.JSON(http.StatusInternalServerError, map[string]string{"message": "Failed to parse pricing data"})
+        }
+        pricing[materialType] = pricePerKg
+    }
+
+    // Calculate total amount for the materials
+    totalAmount := 0.0
+    for _, material := range materials {
+        price, exists := pricing[material.Type]
+        if !exists {
+            return c.JSON(http.StatusBadRequest, map[string]string{
+                "message": fmt.Sprintf("Material type '%s' not recognized", material.Type),
+            })
+        }
+        totalAmount += material.Weight * price
+    }
+
+    // Generate a token for the customer
+    token, err := GenerateToken(transaction.CustomerID, vendorID, totalAmount)
+    if err != nil {
+        return c.JSON(http.StatusInternalServerError, map[string]string{"message": "Failed to generate token"})
+    }
+
+    // Store the token in the customer_tokens table
+    insertTokenQuery := `
+        INSERT INTO customer_tokens (customer_id, vendor_id, token, issued_at)
+        VALUES ($1, $2, $3, NOW())
+    `
+    _, err = config.Pool.Exec(context.Background(), insertTokenQuery, transaction.CustomerID, vendorID, token)
+    if err != nil {
+        return c.JSON(http.StatusInternalServerError, map[string]string{"message": "Failed to store token"})
+    }
+
+    // Log the transaction in the vendor_customer_report table
+    reportData := map[string]interface{}{
+        "transaction_id": transactionID,
+        "materials":      materials,
+        "total_amount":   totalAmount,
+    }
+    reportDataJSON, _ := json.Marshal(reportData)
+
+    insertReportQuery := `
+        INSERT INTO vendor_customer_report (vending_machine_id, vendor_id, report_data, created_at)
+        VALUES ((SELECT vending_machine_id FROM vending_transactions WHERE id = $1), $2, $3, NOW())
+    `
+    _, err = config.Pool.Exec(context.Background(), insertReportQuery, transactionID, vendorID, reportDataJSON)
+    if err != nil {
+		fmt.Println("error: ", err)
+        return c.JSON(http.StatusInternalServerError, map[string]string{"message": "Failed to log customer report"})
+    }
+
+    // Mark the transaction as processed
+    updateTransactionQuery := `
+        UPDATE vending_transactions SET is_processed = TRUE WHERE id = $1
+    `
+    _, err = config.Pool.Exec(context.Background(), updateTransactionQuery, transactionID)
+    if err != nil {
+        return c.JSON(http.StatusInternalServerError, map[string]string{"message": "Failed to update transaction status"})
+    }
+
+    // Return success response
+    return c.JSON(http.StatusOK, map[string]interface{}{
+        "message":   "Recycling facilitated successfully",
+        "token":     token,
+        "amount":    totalAmount,
+        "materials": materials,
+    })
 }

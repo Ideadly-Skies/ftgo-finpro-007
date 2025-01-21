@@ -6,6 +6,7 @@ import (
 	customer_handler "ftgo-finpro/internal/customerHandler"
 	cust_middleware "ftgo-finpro/internal/middleware"
 	vendor_handler "ftgo-finpro/internal/vendorHandler"
+	factory_handler "ftgo-finpro/internal/factoryHandler"
 
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
@@ -35,7 +36,10 @@ func main() {
 	e.POST("/vendor-admin/register", vendor_handler.RegisterVendorAdmin)
 	e.POST("/vendor-admin/login", vendor_handler.LoginVendorAdmin)
 
-	// protected routes for customer using JWT middleware
+	e.POST("/factory-admin/register", factory_handler.RegisterFactoryAdmin)
+	e.POST("/factory-admin/login", factory_handler.LoginFactoryAdmin)
+
+	/* protected routes for customer using JWT middleware */
 	customerGroup := e.Group("/customer")
 	customerGroup.Use(cust_middleware.JWTMiddleware)
 
@@ -55,12 +59,24 @@ func main() {
 	storeAdminGroup.POST("/recycle/:customer_id", admin_handler.RecycleMaterials)
 	storeAdminGroup.POST("/redeem-token/:customer_id", admin_handler.RedeemToken)
 
-	// protected routes for vendor admin using JWT middleware
+	/* protected routes for vendor admin using JWT middleware */
 	vendorAdminGroup := e.Group("/vendor-admin")
 	vendorAdminGroup.Use(cust_middleware.JWTMiddleware)
 
+	// facilitate generation of token for customer
 	vendorAdminGroup.GET("/transactions", vendor_handler.GetTransactions)
 	vendorAdminGroup.POST("/recycle/:transaction_id", vendor_handler.FacilitateCustomerRecycle)
+
+	// check fill status of a particular vending machine & request pickup for payday
+	vendorAdminGroup.GET("/vending-machines/:vending_machine_id/status", vendor_handler.GetVendingMachineStatus)
+	vendorAdminGroup.POST("/vending-machines/:vending_machine_id/request-pickup", vendor_handler.RequestPickup)
+
+	/* protected routes for factory admin using JWT middleware */
+	factoryAdminGroup := e.Group("/factory-admin")
+	factoryAdminGroup.Use(cust_middleware.JWTMiddleware)
+
+	// process factory request
+	factoryAdminGroup.POST("/process-request/:request_id", factory_handler.ProcessFactoryRequest)
 
 	// start the server at 8080
 	e.Logger.Fatal(e.Start(":8080"))

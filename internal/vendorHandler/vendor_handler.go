@@ -348,3 +348,84 @@ func FacilitateCustomerRecycle(c echo.Context) error {
         "materials": materials,
     })
 }
+
+// check vending machine fill status
+func GetVendingMachineStatus(c echo.Context) error {
+	// Extract vending machine ID from the URL
+	vendingMachineID := c.Param("vending_machine_id")
+	if vendingMachineID == "" {
+		return c.JSON(http.StatusBadRequest, map[string]string{"message": "Vending machine ID is required"})
+	}
+
+	// Query the vending machine status
+	var weightLimit, currentWeight float64
+	var currentFill int
+	var compatiblePlastics []string
+	query := `
+		SELECT weight_limit, current_weight, current_fill, compatible_plastics
+		FROM vending_machines WHERE id = $1
+	`
+	var plasticsJSON []byte
+	err := config.Pool.QueryRow(context.Background(), query, vendingMachineID).Scan(&weightLimit, &currentWeight, &currentFill, &plasticsJSON)
+	if err != nil {
+		fmt.Println("error: ", err)
+		return c.JSON(http.StatusInternalServerError, map[string]string{"message": "Failed to fetch vending machine status"})
+	}
+
+	// Parse the JSONB column into a Go slice
+	if err := json.Unmarshal(plasticsJSON, &compatiblePlastics); err != nil {
+		fmt.Println("error: ", err)
+		return c.JSON(http.StatusInternalServerError, map[string]string{"message": "Failed to parse compatible plastics"})
+	}
+
+	// Return the status
+	return c.JSON(http.StatusOK, map[string]interface{}{
+		"vending_machine_id": vendingMachineID,
+		"weight_limit":       weightLimit,
+		"current_weight":     currentWeight,
+		"current_fill":       currentFill,
+		"compatible_plastics": compatiblePlastics,
+		"is_full":            currentWeight >= weightLimit,
+	})
+}
+
+// RequestPickup handles creating a pickup request for a vending machine
+func RequestPickup(c echo.Context) error {
+	// Extract vendor admin details from JWT claims
+	user := c.Get("user").(*jwt.Token)
+	claims := user.Claims.(jwt.MapClaims)
+	vendorID := claims["vendor_id"].(string)
+
+	// Extract vending machine ID from the URL
+	vendingMachineID := c.Param("vending_machine_id")
+	if vendingMachineID == "" {
+		return c.JSON(http.StatusBadRequest, map[string]string{"message": "Vending machine ID is required"})
+	}
+
+	// Check if the vending machine is full
+	var isFull bool
+	query := `
+		SELECT current_weight >= weight_limit AS is_full
+		FROM vending_machines WHERE id = $1 AND vendor_id = $2
+	`
+	err := config.Pool.QueryRow(context.Background(), query, vendingMachineID, vendorID).Scan(&isFull)
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]string{"message": "Failed to fetch vending machine status"})
+	}
+	if !isFull {
+		return c.JSON(http.StatusBadRequest, map[string]string{"message": "Vending machine is not full"})
+	}
+
+	// Create a factory vendor request
+	insertQuery := `
+		INSERT INTO factory_vendor_requests (vendor_id, factory_id, vending_machine_id, status, created_at)
+		VALUES ($1, (SELECT id FROM factories LIMIT 1), $2, 'Pending', NOW())
+	`
+	_, err = config.Pool.Exec(context.Background(), insertQuery, vendorID, vendingMachineID)
+	if err != nil {
+		fmt.Println(err)
+		return c.JSON(http.StatusInternalServerError, map[string]string{"message": "Failed to request pickup"})
+	}
+
+	return c.JSON(http.StatusOK, map[string]string{"message": "Pickup requested successfully"})
+}

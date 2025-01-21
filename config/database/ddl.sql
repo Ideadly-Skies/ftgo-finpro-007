@@ -164,6 +164,7 @@ CREATE TABLE factory_admins (
     name VARCHAR(255) NOT NULL,
     email VARCHAR(255) UNIQUE NOT NULL,
     password VARCHAR(255) NOT NULL,
+    jwt_token TEXT, -- Added JWT Token
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -173,6 +174,7 @@ CREATE TABLE factory_vendor_requests (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     vendor_id UUID REFERENCES vendors(id),
     factory_id UUID REFERENCES factories(id),
+    vending_machine_id UUID REFERENCES vending_machines(id),
     status VARCHAR(50) DEFAULT 'Pending',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -256,6 +258,11 @@ INSERT INTO vendors (name, phone_number, email, password) VALUES
 ('Plastic Recycler Co.', '123456789', 'recycler@example.com', 'recyclepass'),
 ('Recycle Pro', '0987654321', 'admin@recyclepro.com', 'prorecycle123');
 
+-- Insert sample factories
+INSERT INTO factories (name, location) VALUES
+('Green Factory Co.', '123 Eco Lane, Eco City'),
+('Recycle Plant A', '45 Green Road, Sustainability Town');
+
 -- Insert sample vending machines
 INSERT INTO vending_machines (store_id, vendor_id, type, weight_limit, compatible_plastics) VALUES
 ((SELECT id FROM stores LIMIT 1), (SELECT id FROM vendors LIMIT 1), 'Plastic', 100.0, '["PET", "HDPE"]'),
@@ -272,7 +279,8 @@ INSERT INTO vendor_admins (vendor_id, name, email, password) VALUES
 
 -- Insert sample factory admins
 INSERT INTO factory_admins (factory_id, name, email, password) VALUES
-((SELECT id FROM factories LIMIT 1), 'Factory Admin Dave', 'admin.dave@factory.com', 'factorypass123');
+((SELECT id FROM factories LIMIT 1), 'Factory Admin Dave', 'admin.dave@factory.com', 'factorypass123'),
+((SELECT id FROM factories OFFSET 1 LIMIT 1), 'Factory Admin Jane', 'admin.jane@factoryb.com', 'factorypass456');
 
 -- Plastics pricing seed
 INSERT INTO plastics_pricing (type, price_per_kg_factory, price_per_kg_customer) VALUES

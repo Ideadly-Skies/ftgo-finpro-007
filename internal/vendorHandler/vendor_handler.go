@@ -225,18 +225,24 @@ func GetTransactions(c echo.Context) error {
 }
 
 // facilitate customer token generation
-var secretKey = []byte("vendor_customer_secret_key")
-
 func GenerateToken(customerID, vendorID string, amount float64) (string, error) {
 	claims := jwt.MapClaims{
 		"customer_id": customerID,
 		"vendor_id":   vendorID,
 		"amount":      amount,
 		"issued_at":   time.Now().Unix(),
+	}	
+	
+	// derive vendor customer secret from .env
+	var vendorCustomerSecret =  os.Getenv("VENDOR_CUSTOMER_SECRET")
+
+	// Ensure the secret key is not empty
+	if vendorCustomerSecret == "" {
+		return "", fmt.Errorf("VENDOR_CUSTOMER_SECRET is not set in the environment")
 	}
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	return token.SignedString(secretKey)
+	return token.SignedString([]byte(vendorCustomerSecret))
 }
 
 func FacilitateCustomerRecycle(c echo.Context) error {
@@ -322,6 +328,7 @@ func FacilitateCustomerRecycle(c echo.Context) error {
 	// Generate a token for the customer
 	token, err := GenerateToken(transaction.CustomerID, vendorID, totalAmount)
 	if err != nil {
+		fmt.Println(err)
 		return c.JSON(http.StatusInternalServerError, map[string]string{"message": "Failed to generate token"})
 	}
 

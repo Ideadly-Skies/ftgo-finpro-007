@@ -452,17 +452,24 @@ func RecycleMaterials(c echo.Context) error {
 }
 
 // decode the token from the vendor into the customer's wallet
-var secretKey = []byte("vendor_customer_secret_key")
-
 func DecodeToken(tokenString string) (map[string]interface{}, error) {
+	// Load the secret key from the environment
+	vendorCustomerSecret := os.Getenv("VENDOR_CUSTOMER_SECRET")
+
+	// Ensure the secret key is not empty
+	if vendorCustomerSecret == "" {
+		return nil, fmt.Errorf("VENDOR_CUSTOMER_SECRET is not set in the environment")
+	}
+	
+	// Parse the token using the secret key
 	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
-		return secretKey, nil
+		return []byte(vendorCustomerSecret), nil
 	})
 	if err != nil {
 		return nil, fmt.Errorf("invalid token")
 	}
 
-	// Verify token validity
+	// Verify token validity and extract claims
 	if claims, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
 		return claims, nil
 	}

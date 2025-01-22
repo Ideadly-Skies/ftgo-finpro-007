@@ -202,6 +202,16 @@ CREATE TABLE plastics_pricing (
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Table: Store Coordinates (latitude, longitude)
+CREATE TABLE store_coordinates (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    store_name VARCHAR(255) NOT NULL,
+    coordinates POINT NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+
 -- DML Queries: Sample Data Population
 -- Insert sample customers
 INSERT INTO customers (name, email, password) VALUES
@@ -269,3 +279,8 @@ INSERT INTO plastics_pricing (type, price_per_kg_factory, price_per_kg_customer)
 ('HDPE', 11000.00, 9350.00), -- Factory price: 11,000, Customer price: 15% less
 ('LDPE', 10500.00, 8925.00), -- Factory price: 10,500, Customer price: 15% less (10,500 * 0.85)
 ('PP', 10500.00, 8925.00); -- Factory price: 10,500, Customer price: 15% less
+
+-- Insert sample store coordinates
+INSERT INTO store_coordinates (store_name, coordinates) VALUES
+('Costco', '(-6.166694558903548,106.84852183784476)'),
+('Target', '(-6.1627157901078435,106.84914410900927)');

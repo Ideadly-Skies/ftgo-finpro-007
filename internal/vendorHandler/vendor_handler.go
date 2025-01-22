@@ -124,6 +124,9 @@ func LoginVendorAdmin(c echo.Context) error {
 		return c.JSON(http.StatusBadRequest, map[string]string{"message": "Invalid Request"})
 	}
 
+	// Convert email to lowercase for case-insensitive comparison
+	req.Email = strings.ToLower(req.Email)
+
 	// Fetch admin details
 	var admin VendorAdmin
 	query := `

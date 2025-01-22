@@ -83,6 +83,9 @@ func LoginCustomer(c echo.Context) error {
 		return c.JSON(http.StatusBadRequest, map[string]string{"message": "Invalid Request"})
 	}
 
+	// Convert email to lowercase for case-insensitive comparison
+	req.Email = strings.ToLower(req.Email)
+
 	// Fetch customer details
 	var customer models.Customer
 	query := `SELECT id, name, email, password, wallet_balance, inventory, is_verified FROM customers WHERE email = $1`

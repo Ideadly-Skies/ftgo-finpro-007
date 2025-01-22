@@ -457,3 +457,43 @@ func GetCustomerTokens(c echo.Context) error {
 		"tokens":  tokens,
 	})
 }
+
+func GetAllStoreCoordinate(c echo.Context) error {
+	// Query to fetch all store coordinates
+	query := `
+		SELECT store_name, coordinate
+		FROM store_coordinates
+	`
+	rows, err := config.Pool.Query(context.Background(), query)
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]string{
+			"message": "Failed to fetch store coordinates",
+		})
+	}
+	defer rows.Close()
+
+	// Collect store coordinates into a slice
+	var stores []struct {
+		Name       string `json:"store_name"`
+		Coordinate string `json:"coordinate"`
+	}
+
+	for rows.Next() {
+		var store struct {
+			Name       string `json:"store_name"`
+			Coordinate string `json:"coordinate"`
+		}
+		if err = rows.Scan(&store.Name, &store.Coordinate); err != nil {
+			return c.JSON(http.StatusInternalServerError, map[string]string{
+				"message": "Failed to parse store coordinates",
+			})
+		}
+		stores = append(stores, store)
+	}
+
+	// Return store coordinates in JSON format
+	return c.JSON(http.StatusOK, map[string]interface{}{
+		"message": "We found the store locations for you!",
+		"stores":  stores,
+	})
+}

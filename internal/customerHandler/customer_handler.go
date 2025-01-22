@@ -1,20 +1,15 @@
-package handler 
+package handler
 
 import (
 	"context"
 	"fmt"
-	"ftgo-finpro/utils"
-	"log"
 	"net/http"
 	"time"
 
 	config "ftgo-finpro/config/database"
 
 	"github.com/golang-jwt/jwt/v4"
-	"github.com/jackc/pgconn"
 	"github.com/labstack/echo/v4"
-	"golang.org/x/crypto/bcrypt"
-
 	"github.com/midtrans/midtrans-go"
 	"github.com/midtrans/midtrans-go/coreapi"
 
@@ -22,42 +17,6 @@ import (
 	"os"
 	"strings"
 )
-
-// Customer struct
-type Customer struct {
-	ID            string  `json:"id"`
-	Name          string  `json:"name"`
-	Email         string  `json:"email"`
-	Password      string  `json:"password"`
-	JwtToken      string  `json:"jwt_token"`
-	WalletBalance float64 `json:"wallet_balance"`
-	TokenList     string  `json:"token_list"`
-	Inventory     string  `json:"inventory"`
-	IsVerified    bool    `json:"is_verified"`
-	CreatedAt     string  `json:"created_at"`
-	UpdatedAt     string  `json:"updated_at"`
-}
-
-// RegisterRequest struct
-type RegisterRequest struct {
-	Name     string `json:"name" validate:"required"`
-	Email    string `json:"email" validate:"required,email"`
-	Password string `json:"password" validate:"required"`
-}
-
-// LoginRequest struct
-type LoginRequest struct {
-	Email    string `json:"email" validate:"required,email"`
-	Password string `json:"password" validate:"required"`
-}
-
-// LoginResponse struct
-type LoginResponse struct {
-	Token         string  `json:"token"`
-	Name          string  `json:"name"`
-	Email         string  `json:"email"`
-	WalletBalance float64 `json:"wallet_balance"`
-}
 
 // PaymentRequest represents a request for financial transactions like withdrawals or top-ups.
 type PaymentRequest struct {
@@ -73,98 +32,6 @@ func Init() {
 
 	coreAPI = coreapi.Client{}
 	coreAPI.New(ServerKey, midtrans.Sandbox)
-}
-
-var jwtSecret = []byte("12345")
-
-// RegisterCustomer handles customer registration
-func RegisterCustomer(c echo.Context) error {
-	var req RegisterRequest
-	if err := c.Bind(&req); err != nil {
-		return c.JSON(http.StatusBadRequest, map[string]string{"message": "Invalid Request"})
-	}
-
-	// Hash the password
-	hashPassword, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
-	if err != nil {
-		return c.JSON(http.StatusInternalServerError, map[string]string{"message": "Internal Server Error"})
-	}
-
-	// Insert into customers table
-	customerQuery := "INSERT INTO customers (name, email, password) VALUES ($1, $2, $3) RETURNING id"
-	var customerID string
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	err = config.Pool.QueryRow(ctx, customerQuery, req.Name, req.Email, string(hashPassword)).Scan(&customerID)
-	if err != nil {
-		if pgErr, ok := err.(*pgconn.PgError); ok && pgErr.Code == "23505" {
-			return c.JSON(http.StatusBadRequest, map[string]string{"message": "Email already registered"})
-		}
-		return c.JSON(http.StatusInternalServerError, map[string]string{"message": "Internal Server Error"})
-	}
-
-	if err := utils.SendRegisterNotification(req.Email, req.Name); err != nil {
-		log.Printf("Failed to send email: %v", err)
-	}
-	return c.JSON(http.StatusOK, map[string]interface{}{
-		"message": fmt.Sprintf("Customer %s registered successfully", req.Name),
-		"email":   req.Email,
-	})
-}
-
-// LoginCustomer handles customer login
-func LoginCustomer(c echo.Context) error {
-	var req LoginRequest
-	if err := c.Bind(&req); err != nil {
-		return c.JSON(http.StatusBadRequest, map[string]string{"message": "Invalid Request"})
-	}
-
-	// Fetch customer details
-	var customer Customer
-	query := `SELECT id, name, email, password, wallet_balance, inventory, is_verified FROM customers WHERE email = $1`
-	err := config.Pool.QueryRow(context.Background(), query, req.Email).Scan(
-		&customer.ID, &customer.Name, &customer.Email, &customer.Password,
-		&customer.WalletBalance, &customer.Inventory, &customer.IsVerified,
-	)
-	if err != nil {
-		return c.JSON(http.StatusBadRequest, map[string]string{"message": "Invalid email or password"})
-	}
-
-	// Compare password
-	if err := bcrypt.CompareHashAndPassword([]byte(customer.Password), []byte(req.Password)); err != nil {
-		return c.JSON(http.StatusBadRequest, map[string]string{"message": "Invalid email or password"})
-	}
-
-	// Generate JWT token
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
-		"customer_id":    customer.ID,
-		"name":           customer.Name,
-		"email":          customer.Email,
-		"wallet_balance": customer.WalletBalance,
-		"inventory":      customer.Inventory,
-		"is_verified":    customer.IsVerified,
-		"exp":            jwt.NewNumericDate(time.Now().Add(72 * time.Hour)),
-	})
-	tokenString, err := token.SignedString(jwtSecret)
-	if err != nil {
-		return c.JSON(http.StatusInternalServerError, map[string]string{"message": "Failed to generate token"})
-	}
-
-	// Update JWT token in the database
-	updateQuery := "UPDATE customers SET jwt_token = $1 WHERE id = $2"
-	_, err = config.Pool.Exec(context.Background(), updateQuery, tokenString, customer.ID)
-	if err != nil {
-		return c.JSON(http.StatusInternalServerError, map[string]string{"message": "Failed to update token"})
-	}
-
-	// Return login response
-	return c.JSON(http.StatusOK, LoginResponse{
-		Token:         tokenString,
-		Name:          customer.Name,
-		Email:         customer.Email,
-		WalletBalance: customer.WalletBalance,
-	})
 }
 
 func GetWalletBalance(c echo.Context) error {
@@ -519,7 +386,7 @@ func CheckPurchaseStatus(c echo.Context) error {
 		`
 		purchasedItemsJSON, _ := json.Marshal(purchasedItems)
 		if _, err := config.Pool.Exec(context.Background(), transactionQuery, customerID, storeID, purchasedItemsJSON, resp.GrossAmount); err != nil {
-		return c.JSON(http.StatusInternalServerError, map[string]string{"message": "Failed to record transaction"})
+			return c.JSON(http.StatusInternalServerError, map[string]string{"message": "Failed to record transaction"})
 		}
 	}
 
@@ -534,59 +401,59 @@ func CheckPurchaseStatus(c echo.Context) error {
 }
 
 func GetCustomerTokens(c echo.Context) error {
-    // Extract customer ID from JWT claims
-    user := c.Get("user").(*jwt.Token)
-    claims := user.Claims.(jwt.MapClaims)
-    customerID, ok := claims["customer_id"].(string)
-    if !ok || customerID == "" {
-        return c.JSON(http.StatusUnauthorized, map[string]string{
-            "message": "Unauthorized: Missing or invalid customer ID",
-        })
-    }
+	// Extract customer ID from JWT claims
+	user := c.Get("user").(*jwt.Token)
+	claims := user.Claims.(jwt.MapClaims)
+	customerID, ok := claims["customer_id"].(string)
+	if !ok || customerID == "" {
+		return c.JSON(http.StatusUnauthorized, map[string]string{
+			"message": "Unauthorized: Missing or invalid customer ID",
+		})
+	}
 
-    // Query to fetch all tokens for the logged-in customer
-    query := `
+	// Query to fetch all tokens for the logged-in customer
+	query := `
         SELECT id, vendor_id, token, issued_at, is_redeemed
         FROM customer_tokens
         WHERE customer_id = $1
         ORDER BY issued_at DESC
     `
-    rows, err := config.Pool.Query(context.Background(), query, customerID)
-    if err != nil {
-        return c.JSON(http.StatusInternalServerError, map[string]string{
-            "message": "Failed to fetch customer tokens",
-        })
-    }
-    defer rows.Close()
+	rows, err := config.Pool.Query(context.Background(), query, customerID)
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]string{
+			"message": "Failed to fetch customer tokens",
+		})
+	}
+	defer rows.Close()
 
-    // Collect tokens into a slice
-    var tokens []struct {
-        ID         string    `json:"id"`
-        VendorID   string    `json:"vendor_id"`
-        Token      string    `json:"token"`
-        IssuedAt   time.Time `json:"issued_at"`
-        IsRedeemed bool      `json:"is_redeemed"`
-    }
+	// Collect tokens into a slice
+	var tokens []struct {
+		ID         string    `json:"id"`
+		VendorID   string    `json:"vendor_id"`
+		Token      string    `json:"token"`
+		IssuedAt   time.Time `json:"issued_at"`
+		IsRedeemed bool      `json:"is_redeemed"`
+	}
 
-    for rows.Next() {
-        var token struct {
-            ID         string    `json:"id"`
-            VendorID   string    `json:"vendor_id"`
-            Token      string    `json:"token"`
-            IssuedAt   time.Time `json:"issued_at"`
-            IsRedeemed bool      `json:"is_redeemed"`
-        }
-        if err := rows.Scan(&token.ID, &token.VendorID, &token.Token, &token.IssuedAt, &token.IsRedeemed); err != nil {
-            return c.JSON(http.StatusInternalServerError, map[string]string{
-                "message": "Failed to parse tokens",
-            })
-        }
-        tokens = append(tokens, token)
-    }
+	for rows.Next() {
+		var token struct {
+			ID         string    `json:"id"`
+			VendorID   string    `json:"vendor_id"`
+			Token      string    `json:"token"`
+			IssuedAt   time.Time `json:"issued_at"`
+			IsRedeemed bool      `json:"is_redeemed"`
+		}
+		if err := rows.Scan(&token.ID, &token.VendorID, &token.Token, &token.IssuedAt, &token.IsRedeemed); err != nil {
+			return c.JSON(http.StatusInternalServerError, map[string]string{
+				"message": "Failed to parse tokens",
+			})
+		}
+		tokens = append(tokens, token)
+	}
 
-    // Return tokens in JSON format
-    return c.JSON(http.StatusOK, map[string]interface{}{
-        "message": "Customer tokens fetched successfully",
-        "tokens":  tokens,
-    })
+	// Return tokens in JSON format
+	return c.JSON(http.StatusOK, map[string]interface{}{
+		"message": "Customer tokens fetched successfully",
+		"tokens":  tokens,
+	})
 }

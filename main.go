@@ -4,9 +4,9 @@ import (
 	"ftgo-finpro/config/database"
 	admin_handler "ftgo-finpro/internal/adminStoreHandler"
 	customer_handler "ftgo-finpro/internal/customerHandler"
+	factory_handler "ftgo-finpro/internal/factoryHandler"
 	cust_middleware "ftgo-finpro/internal/middleware"
 	vendor_handler "ftgo-finpro/internal/vendorHandler"
-	factory_handler "ftgo-finpro/internal/factoryHandler"
 
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
@@ -14,7 +14,7 @@ import (
 
 func main() {
 	// migrate data to supabase
-	// config.MigrateData()
+	//config.MigrateData()
 
 	// connect to db
 	config.InitDB()
@@ -49,6 +49,8 @@ func main() {
 	customerGroup.GET("/wallet/withdraw/status/:order_id", customer_handler.CheckWithdrawalStatus)
 	customerGroup.GET("/transaction/status/:order_id", customer_handler.CheckPurchaseStatus)
 	customerGroup.GET("/get-tokens", customer_handler.GetCustomerTokens)
+	customerGroup.POST("/request-verify", customer_handler.RequestVerify)
+	customerGroup.POST("/delivery", customer_handler.CalculateDistanceAndPrice)
 
 	// protected routes for store admin using JWT middleware
 	storeAdminGroup := e.Group("/store-admin")
@@ -58,6 +60,7 @@ func main() {
 	storeAdminGroup.POST("/purchase", admin_handler.FacilitatePurchase)
 	storeAdminGroup.POST("/recycle/:customer_id", admin_handler.RecycleMaterials)
 	storeAdminGroup.POST("/redeem-token/:customer_id", admin_handler.RedeemToken)
+	storeAdminGroup.POST("/customer-verify", admin_handler.VerifyCustomer)
 
 	/* protected routes for vendor admin using JWT middleware */
 	vendorAdminGroup := e.Group("/vendor-admin")

@@ -1,5 +1,6 @@
 # Environment variables
 .env
+.idea
 
 # Docker configuration
 docker-compose.yml

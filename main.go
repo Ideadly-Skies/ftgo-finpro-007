@@ -50,7 +50,8 @@ func main() {
 	customerGroup.GET("/transaction/status/:order_id", customer_handler.CheckPurchaseStatus)
 	customerGroup.GET("/get-tokens", customer_handler.GetCustomerTokens)
 	customerGroup.POST("/request-verify", customer_handler.RequestVerify)
-	customerGroup.POST("/delivery", customer_handler.CalculateDistanceAndPrice)
+	customerGroup.POST("/delivery", customer_handler.FacilitatePurchaseOnline)
+	customerGroup.GET("/store-locations", customer_handler.GetAllStoreCoordinate)
 
 	// protected routes for store admin using JWT middleware
 	storeAdminGroup := e.Group("/store-admin")

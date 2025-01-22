@@ -18,8 +18,6 @@ import (
 	"strings"
 )
 
-var jwtSecret = []byte("12345")
-
 // Initialize Midtrans Core API client
 var coreAPI coreapi.Client
 

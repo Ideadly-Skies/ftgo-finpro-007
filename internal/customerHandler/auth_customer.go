@@ -5,7 +5,7 @@ import (
 	"errors"
 	"fmt"
 	config "ftgo-finpro/config/database"
-	"ftgo-finpro/internal/adminStoreHandler/models"
+	"ftgo-finpro/internal/customerHandler/models"
 	"ftgo-finpro/utils"
 	"github.com/golang-jwt/jwt/v4"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -20,14 +20,14 @@ import (
 
 var jwtSecret = os.Getenv("JWT_SECRET")
 
-// RegisterStoreAdmin handles store admin registration
-func RegisterStoreAdmin(c echo.Context) error {
+// RegisterCustomer handles customer registration
+func RegisterCustomer(c echo.Context) error {
 	var req models.RegisterRequest
 	if err := c.Bind(&req); err != nil {
 		return c.JSON(http.StatusBadRequest, map[string]string{"message": "Invalid Request"})
 	}
 
-	if req.Name == "" || req.Email == "" || req.Password == "" || req.StoreID == "" {
+	if req.Name == "" || req.Email == "" || req.Password == "" {
 		return c.JSON(http.StatusBadRequest, map[string]string{"message": "All fields are required"})
 	}
 
@@ -49,13 +49,13 @@ func RegisterStoreAdmin(c echo.Context) error {
 		return c.JSON(http.StatusInternalServerError, map[string]string{"message": "Internal Server Error"})
 	}
 
-	// Insert into store_admins table
-	adminQuery := "INSERT INTO store_admins (name, email, password, store_id) VALUES ($1, $2, $3, $4) RETURNING id"
-	var adminID string
+	// Insert into customers table
+	customerQuery := "INSERT INTO customers (name, email, password) VALUES ($1, $2, $3) RETURNING id"
+	var customerID string
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	err = config.Pool.QueryRow(ctx, adminQuery, req.Name, email, string(hashPassword), req.StoreID).Scan(&adminID)
+	err = config.Pool.QueryRow(ctx, customerQuery, req.Name, email, string(hashPassword)).Scan(&customerID)
 	if err != nil {
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) {
@@ -66,58 +66,66 @@ func RegisterStoreAdmin(c echo.Context) error {
 		}
 	}
 
+	if err = utils.SendRegisterNotification(req.Email, req.Name); err != nil {
+		log.Printf("Failed to send email: %v", err)
+	}
+
 	return c.JSON(http.StatusOK, map[string]interface{}{
-		"message": fmt.Sprintf("Store admin %s registered successfully", req.Name),
+		"message": fmt.Sprintf("Customer %s registered successfully", req.Name),
 		"email":   email,
 	})
 }
 
-// LoginStoreAdmin handles store admin login
-func LoginStoreAdmin(c echo.Context) error {
+// LoginCustomer handles customer login
+func LoginCustomer(c echo.Context) error {
 	var req models.LoginRequest
 	if err := c.Bind(&req); err != nil {
 		return c.JSON(http.StatusBadRequest, map[string]string{"message": "Invalid Request"})
 	}
 
-	// Fetch admin details
-	var admin models.StoreAdmin
-	query := `SELECT id, store_id, name, email, password FROM store_admins WHERE email = $1`
+	// Fetch customer details
+	var customer models.Customer
+	query := `SELECT id, name, email, password, wallet_balance, inventory, is_verified FROM customers WHERE email = $1`
 	err := config.Pool.QueryRow(context.Background(), query, req.Email).Scan(
-		&admin.ID, &admin.StoreID, &admin.Name, &admin.Email, &admin.Password,
+		&customer.ID, &customer.Name, &customer.Email, &customer.Password,
+		&customer.WalletBalance, &customer.Inventory, &customer.IsVerified,
 	)
 	if err != nil {
 		return c.JSON(http.StatusBadRequest, map[string]string{"message": "Invalid email or password"})
 	}
 
 	// Compare password
-	if err := bcrypt.CompareHashAndPassword([]byte(admin.Password), []byte(req.Password)); err != nil {
+	if err := bcrypt.CompareHashAndPassword([]byte(customer.Password), []byte(req.Password)); err != nil {
 		return c.JSON(http.StatusBadRequest, map[string]string{"message": "Invalid email or password"})
 	}
 
 	// Generate JWT token
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
-		"admin_id": admin.ID,
-		"name":     admin.Name,
-		"email":    admin.Email,
-		"store_id": admin.StoreID,
-		"exp":      jwt.NewNumericDate(time.Now().Add(72 * time.Hour)),
+		"customer_id":    customer.ID,
+		"name":           customer.Name,
+		"email":          customer.Email,
+		"wallet_balance": customer.WalletBalance,
+		"inventory":      customer.Inventory,
+		"is_verified":    customer.IsVerified,
+		"exp":            jwt.NewNumericDate(time.Now().Add(72 * time.Hour)),
 	})
 	tokenString, err := token.SignedString([]byte(jwtSecret))
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]string{"message": "Failed to generate token"})
 	}
 
-	// Update the JWT token in the database
-	updateQuery := "UPDATE store_admins SET jwt_token = $1 WHERE id = $2"
-	_, err = config.Pool.Exec(context.Background(), updateQuery, tokenString, admin.ID)
+	// Update JWT token in the database
+	updateQuery := "UPDATE customers SET jwt_token = $1 WHERE id = $2"
+	_, err = config.Pool.Exec(context.Background(), updateQuery, tokenString, customer.ID)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]string{"message": "Failed to update token"})
 	}
 
 	// Return login response
 	return c.JSON(http.StatusOK, models.LoginResponse{
-		Token: tokenString,
-		Name:  admin.Name,
-		Email: admin.Email,
+		Token:         tokenString,
+		Name:          customer.Name,
+		Email:         customer.Email,
+		WalletBalance: customer.WalletBalance,
 	})
 }

@@ -2,25 +2,26 @@ package handler
 
 import (
 	"context"
-	"net/http"
 	config "ftgo-finpro/config/database"
+	"net/http"
+	"os"
 
 	"github.com/golang-jwt/jwt/v4"
 	"github.com/labstack/echo/v4"
 
 	"fmt"
-	"time"
 	"github.com/jackc/pgconn"
 	"golang.org/x/crypto/bcrypt"
+	"time"
 )
 
-var jwtSecret = []byte("12345") // for jwt middleware
+var jwtSecret = os.Getenv("JWT_SECRET") // for jwt middleware
 func RegisterFactoryAdmin(c echo.Context) error {
 	var req struct {
-		Name       string `json:"name" validate:"required"`
-		Email      string `json:"email" validate:"required,email"`
-		Password   string `json:"password" validate:"required"`
-		FactoryID  string `json:"factory_id" validate:"required"`
+		Name      string `json:"name" validate:"required"`
+		Email     string `json:"email" validate:"required,email"`
+		Password  string `json:"password" validate:"required"`
+		FactoryID string `json:"factory_id" validate:"required"`
 	}
 
 	if err := c.Bind(&req); err != nil {
@@ -68,11 +69,11 @@ func LoginFactoryAdmin(c echo.Context) error {
 
 	// Fetch admin details from the database
 	var admin struct {
-		ID       string `json:"id"`
+		ID        string `json:"id"`
 		FactoryID string `json:"factory_id"`
-		Name     string `json:"name"`
-		Email    string `json:"email"`
-		Password string `json:"password"`
+		Name      string `json:"name"`
+		Email     string `json:"email"`
+		Password  string `json:"password"`
 	}
 	query := `
 		SELECT id, factory_id, name, email, password 
@@ -98,7 +99,7 @@ func LoginFactoryAdmin(c echo.Context) error {
 		"factory_id": admin.FactoryID,
 		"exp":        jwt.NewNumericDate(time.Now().Add(72 * time.Hour)), // 72-hour expiration
 	})
-	tokenString, err := token.SignedString(jwtSecret)
+	tokenString, err := token.SignedString([]byte(jwtSecret))
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]string{"message": "Failed to generate token"})
 	}
@@ -112,9 +113,9 @@ func LoginFactoryAdmin(c echo.Context) error {
 
 	// Return the login response
 	return c.JSON(http.StatusOK, map[string]interface{}{
-		"token":  tokenString,
-		"name":   admin.Name,
-		"email":  admin.Email,
+		"token":      tokenString,
+		"name":       admin.Name,
+		"email":      admin.Email,
 		"factory_id": admin.FactoryID,
 	})
 }

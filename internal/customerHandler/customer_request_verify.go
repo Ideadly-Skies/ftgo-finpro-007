@@ -12,6 +12,17 @@ type VerifyRequest struct {
 	Email string `json:"email"`
 }
 
+// RequestVerify godoc
+// @Summary Request email verification
+// @Description Sends an email verification request to the user with the provided email and name.
+// @Tags Verification
+// @Accept json
+// @Produce json
+// @Param body body VerifyRequest true "Verification Request"
+// @Success 200 {object} map[string]string "Your verification request has been received, kindly check your email regularly."
+// @Failure 400 {object} map[string]string "Invalid request body or missing fields"
+// @Failure 500 {object} map[string]string "Failed to send email"
+// @Router /verification/request [post]
 func RequestVerify(c echo.Context) error {
 	var req VerifyRequest
 

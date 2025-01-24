@@ -17,6 +17,18 @@ import (
 	"time"
 )
 
+// FacilitatePurchaseOnline godoc
+// @Summary Facilitate an online purchase
+// @Description Handles customer purchase requests and processes payments via wallet or online methods.
+// @Tags Purchases
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param purchaseRequest body FacilitatePurchaseRequest true "Purchase Request Body"
+// @Success 200 {object} models.PurchaseResponse "Purchase successful"
+// @Failure 400 {object} map[string]string "Invalid request or insufficient stock/wallet balance"
+// @Failure 500 {object} map[string]string "Failed to process purchase or update inventory"
+// @Router /purchase/online [post]
 func FacilitatePurchaseOnline(c echo.Context) error {
 	// Extract admin claims
 	admin := c.Get("user").(*jwt.Token)

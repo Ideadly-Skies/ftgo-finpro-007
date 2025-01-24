@@ -20,7 +20,17 @@ import (
 
 var jwtSecret = os.Getenv("JWT_SECRET")
 
-// RegisterCustomer handles customer registration
+// RegisterCustomer godoc
+// @Summary Register a new customer
+// @Description This endpoint registers a new customer with name, email, and password.
+// @Tags Customers
+// @Accept json
+// @Produce json
+// @Param request body models.RegisterRequest true "Request body for registering a customer"
+// @Success 200 {object} map[string]interface{} "Customer registered successfully"
+// @BadRequest 400 {object} map[string]string "Invalid request, email already registered, or validation errors"
+// @InternalServerError 500 {object} map[string]string "Internal Server Error"
+// @Router /register-customer [post]
 func RegisterCustomer(c echo.Context) error {
 	var req models.RegisterRequest
 	if err := c.Bind(&req); err != nil {
@@ -76,7 +86,17 @@ func RegisterCustomer(c echo.Context) error {
 	})
 }
 
-// LoginCustomer handles customer login
+// LoginCustomer godoc
+// @Summary Login a customer
+// @Description This endpoint authenticates a customer using their email and password and returns a JWT token.
+// @Tags Customers
+// @Accept json
+// @Produce json
+// @Param request body models.LoginRequest true "Request body for logging in a customer"
+// @Success 200 {object} models.LoginResponse "Login successful with token and customer details"
+// @BadRequest 400 {object} map[string]string "Invalid email or password"
+// @InternalServerError 500 {object} map[string]string "Failed to generate or update token"
+// @Router /login-customer [post]
 func LoginCustomer(c echo.Context) error {
 	var req models.LoginRequest
 	if err := c.Bind(&req); err != nil {

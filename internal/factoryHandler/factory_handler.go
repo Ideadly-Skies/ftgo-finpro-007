@@ -15,7 +15,34 @@ import (
 	"time"
 )
 
+
+// RegisterFactoryAdminRequest defines the request body for registering a factory admin
+type RegisterFactoryAdminRequest struct {
+	Name      string `json:"name" validate:"required"`
+	Email     string `json:"email" validate:"required,email"`
+	Password  string `json:"password" validate:"required"`
+	FactoryID string `json:"factory_id" validate:"required"`
+}
+
+// LoginFactoryAdminRequest defines the request body for logging w/ a factory admin account
+type LoginFactoryAdminRequest struct {
+	Email    string `json:"email" validate:"required,email"`
+	Password string `json:"password" validate:"required"`
+}
+
 var jwtSecret = os.Getenv("JWT_SECRET") // for jwt middleware
+
+// RegisterFactoryAdmin godoc
+// @Summary Register a factory admin
+// @Description Registers a new factory admin with a name, email, password, and associated factory ID.
+// @Tags Factory Admin
+// @Accept json
+// @Produce json
+// @Param body body handler.RegisterFactoryAdminRequest true "Register Factory Admin Request"
+// @Success 200 {object} map[string]interface{} "Admin registered successfully"
+// @Failure 400 {object} map[string]string "Invalid request or email already registered"
+// @Failure 500 {object} map[string]string "Internal server error"
+// @Router /factory-admin/register [post]
 func RegisterFactoryAdmin(c echo.Context) error {
 	var req struct {
 		Name      string `json:"name" validate:"required"`
@@ -57,6 +84,17 @@ func RegisterFactoryAdmin(c echo.Context) error {
 	})
 }
 
+// LoginFactoryAdmin godoc
+// @Summary Login for factory admin
+// @Description Authenticates a factory admin using their email and password and returns a JWT token.
+// @Tags Factory Admin
+// @Accept json
+// @Produce json
+// @Param body body handler.LoginFactoryAdminRequest true "Login Factory Admin Request"
+// @Success 200 {object} map[string]interface{} "Login successful with token"
+// @Failure 400 {object} map[string]string "Invalid email or password"
+// @Failure 500 {object} map[string]string "Internal server error"
+// @Router /factory-admin/login [post]
 func LoginFactoryAdmin(c echo.Context) error {
 	var req struct {
 		Email    string `json:"email" validate:"required,email"`
@@ -120,6 +158,19 @@ func LoginFactoryAdmin(c echo.Context) error {
 	})
 }
 
+// ProcessFactoryRequest godoc
+// @Summary Process a factory vendor request
+// @Description Processes a pending vendor request for a specific vending machine, updates vendor revenue, and resets the vending machine.
+// @Tags Factory Admin
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param request_id path string true "Request ID"
+// @Success 200 {object} map[string]interface{} "Request processed successfully"
+// @Failure 400 {object} map[string]string "Invalid request ID or unauthorized access"
+// @Failure 404 {object} map[string]string "Request or vending machine not found"
+// @Failure 500 {object} map[string]string "Internal server error"
+// @Router /factory-admin/request/{request_id} [post]
 func ProcessFactoryRequest(c echo.Context) error {
 	// Extract factory admin details from JWT claims
 	user := c.Get("user").(*jwt.Token)

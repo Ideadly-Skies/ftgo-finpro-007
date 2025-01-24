@@ -23,6 +23,558 @@ const docTemplate = `{
     "host": "{{.Host}}",
     "basePath": "{{.BasePath}}",
     "paths": {
+        "/customers/purchase-status/{order_id}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Checks the status of a customer's purchase transaction and updates inventory if successful.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Customers"
+                ],
+                "summary": "Check purchase status",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Order ID of the transaction",
+                        "name": "order_id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Purchase status and inventory updated successfully",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid transaction or insufficient stock",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Failed to fetch transaction status or update inventory",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/customers/tokens": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Retrieves all tokens for the logged-in customer.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Customers"
+                ],
+                "summary": "Retrieve customer tokens",
+                "responses": {
+                    "200": {
+                        "description": "Customer tokens fetched successfully",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized: Missing or invalid customer ID",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Failed to fetch or parse tokens",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/customers/wallet-balance": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Retrieves the wallet balance for the logged-in customer.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Customers"
+                ],
+                "summary": "Retrieve customer wallet balance",
+                "responses": {
+                    "200": {
+                        "description": "Wallet balance retrieved successfully",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "500": {
+                        "description": "Failed to retrieve wallet balance",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/customers/withdraw": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Processes a withdrawal request for the customer and creates a virtual account number for the transaction.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Customers"
+                ],
+                "summary": "Initiate a withdrawal for the customer",
+                "parameters": [
+                    {
+                        "description": "Withdrawal request body",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handler.PaymentRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Withdrawal initiated successfully",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request or withdrawal amount",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Failed to process withdrawal",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/customers/withdrawal-status/{order_id}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Checks the status of a customer's withdrawal transaction.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Customers"
+                ],
+                "summary": "Check withdrawal status",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Order ID of the transaction",
+                        "name": "order_id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Transaction status retrieved successfully",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid transaction request",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Failed to fetch transaction status",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/factory-admin/login": {
+            "post": {
+                "description": "Authenticates a factory admin using their email and password and returns a JWT token.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Factory Admin"
+                ],
+                "summary": "Login for factory admin",
+                "parameters": [
+                    {
+                        "description": "Login Factory Admin Request",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handler.LoginFactoryAdminRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Login successful with token",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid email or password",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/factory-admin/register": {
+            "post": {
+                "description": "Registers a new factory admin with a name, email, password, and associated factory ID.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Factory Admin"
+                ],
+                "summary": "Register a factory admin",
+                "parameters": [
+                    {
+                        "description": "Register Factory Admin Request",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handler.RegisterFactoryAdminRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Admin registered successfully",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request or email already registered",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/factory-admin/request/{request_id}": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Processes a pending vendor request for a specific vending machine, updates vendor revenue, and resets the vending machine.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Factory Admin"
+                ],
+                "summary": "Process a factory vendor request",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Request ID",
+                        "name": "request_id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Request processed successfully",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request ID or unauthorized access",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Request or vending machine not found",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/login-customer": {
+            "post": {
+                "description": "This endpoint authenticates a customer using their email and password and returns a JWT token.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Customers"
+                ],
+                "summary": "Login a customer",
+                "parameters": [
+                    {
+                        "description": "Request body for logging in a customer",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/ftgo-finpro_internal_customerHandler_models.LoginRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Login successful with token and customer details",
+                        "schema": {
+                            "$ref": "#/definitions/ftgo-finpro_internal_customerHandler_models.LoginResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/purchase/online": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Handles customer purchase requests and processes payments via wallet or online methods.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Purchases"
+                ],
+                "summary": "Facilitate an online purchase",
+                "parameters": [
+                    {
+                        "description": "Purchase Request Body",
+                        "name": "purchaseRequest",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handler.FacilitatePurchaseRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Purchase successful",
+                        "schema": {
+                            "$ref": "#/definitions/models.PurchaseResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request or insufficient stock/wallet balance",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Failed to process purchase or update inventory",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/register-customer": {
+            "post": {
+                "description": "This endpoint registers a new customer with name, email, and password.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Customers"
+                ],
+                "summary": "Register a new customer",
+                "parameters": [
+                    {
+                        "description": "Request body for registering a customer",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/ftgo-finpro_internal_customerHandler_models.RegisterRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Customer registered successfully",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
         "/store-admin/login": {
             "post": {
                 "description": "Authenticates a store admin and returns a JWT token",
@@ -325,6 +877,416 @@ const docTemplate = `{
                 }
             }
         },
+        "/stores/coordinates": {
+            "get": {
+                "description": "Retrieves the coordinates of all stores.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Stores"
+                ],
+                "summary": "Retrieve all store coordinates",
+                "responses": {
+                    "200": {
+                        "description": "Store coordinates retrieved successfully",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "500": {
+                        "description": "Failed to fetch store coordinates",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/vendor-admin/login": {
+            "post": {
+                "description": "Authenticates a vendor admin using email and password, returning a JWT token.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Vendor Admin"
+                ],
+                "summary": "Login for vendor admin",
+                "parameters": [
+                    {
+                        "description": "Vendor Admin Login Request",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handler.LoginVendorAdminRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Login successful with token",
+                        "schema": {
+                            "$ref": "#/definitions/handler.LoginVendorAdminResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid email or password",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/vendor-admin/recycle/{transaction_id}": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Processes a customer recycling transaction, calculates rewards, and generates a token.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Vendor Admin"
+                ],
+                "summary": "Facilitate customer recycling",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Transaction ID",
+                        "name": "transaction_id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Recycling facilitated successfully",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid or unauthorized transaction",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/vendor-admin/register": {
+            "post": {
+                "description": "Registers a new vendor admin with name, email, password, and vendor ID.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Vendor Admin"
+                ],
+                "summary": "Register a vendor admin",
+                "parameters": [
+                    {
+                        "description": "Vendor Admin Registration Request",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handler.RegisterVendorAdminRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Vendor admin registered successfully",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request or email already registered",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/vendor-admin/transactions": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Retrieves all transactions associated with the authenticated vendor.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Vendor Admin"
+                ],
+                "summary": "Get transactions for a vendor",
+                "responses": {
+                    "200": {
+                        "description": "Transactions fetched successfully",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized access",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/vendor-admin/vending-machine/{vending_machine_id}/pickup": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Creates a pickup request for a full vending machine.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Vendor Admin"
+                ],
+                "summary": "Request a vending machine pickup",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Vending Machine ID",
+                        "name": "vending_machine_id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Pickup requested successfully",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid vending machine ID or vending machine is not full",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/vendor-admin/vending-machine/{vending_machine_id}/status": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Retrieves the status of a specific vending machine.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Vendor Admin"
+                ],
+                "summary": "Get vending machine status",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Vending Machine ID",
+                        "name": "vending_machine_id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Vending machine status retrieved successfully",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid vending machine ID",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/verification/request": {
+            "post": {
+                "description": "Sends an email verification request to the user with the provided email and name.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Verification"
+                ],
+                "summary": "Request email verification",
+                "parameters": [
+                    {
+                        "description": "Verification Request",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handler.VerifyRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Your verification request has been received, kindly check your email regularly.",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body or missing fields",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Failed to send email",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/verify-customer": {
             "post": {
                 "description": "This endpoint verifies a customer by their email address.",
@@ -416,6 +1378,57 @@ const docTemplate = `{
                 }
             }
         },
+        "ftgo-finpro_internal_customerHandler_models.LoginRequest": {
+            "type": "object",
+            "required": [
+                "email",
+                "password"
+            ],
+            "properties": {
+                "email": {
+                    "type": "string"
+                },
+                "password": {
+                    "type": "string"
+                }
+            }
+        },
+        "ftgo-finpro_internal_customerHandler_models.LoginResponse": {
+            "type": "object",
+            "properties": {
+                "email": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "token": {
+                    "type": "string"
+                },
+                "wallet_balance": {
+                    "type": "number"
+                }
+            }
+        },
+        "ftgo-finpro_internal_customerHandler_models.RegisterRequest": {
+            "type": "object",
+            "required": [
+                "email",
+                "name",
+                "password"
+            ],
+            "properties": {
+                "email": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "password": {
+                    "type": "string"
+                }
+            }
+        },
         "handler.FacilitatePurchaseRequest": {
             "type": "object",
             "required": [
@@ -436,6 +1449,61 @@ const docTemplate = `{
                 "payment_method": {
                     "description": "\"Wallet\" or \"Online\"",
                     "type": "string"
+                }
+            }
+        },
+        "handler.LoginFactoryAdminRequest": {
+            "type": "object",
+            "required": [
+                "email",
+                "password"
+            ],
+            "properties": {
+                "email": {
+                    "type": "string"
+                },
+                "password": {
+                    "type": "string"
+                }
+            }
+        },
+        "handler.LoginVendorAdminRequest": {
+            "type": "object",
+            "required": [
+                "email",
+                "password"
+            ],
+            "properties": {
+                "email": {
+                    "type": "string"
+                },
+                "password": {
+                    "type": "string"
+                }
+            }
+        },
+        "handler.LoginVendorAdminResponse": {
+            "type": "object",
+            "properties": {
+                "email": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "token": {
+                    "type": "string"
+                }
+            }
+        },
+        "handler.PaymentRequest": {
+            "type": "object",
+            "required": [
+                "amount"
+            ],
+            "properties": {
+                "amount": {
+                    "type": "number"
                 }
             }
         },
@@ -479,6 +1547,106 @@ const docTemplate = `{
             "properties": {
                 "token": {
                     "type": "string"
+                }
+            }
+        },
+        "handler.RegisterFactoryAdminRequest": {
+            "type": "object",
+            "required": [
+                "email",
+                "factory_id",
+                "name",
+                "password"
+            ],
+            "properties": {
+                "email": {
+                    "type": "string"
+                },
+                "factory_id": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "password": {
+                    "type": "string"
+                }
+            }
+        },
+        "handler.RegisterVendorAdminRequest": {
+            "type": "object",
+            "required": [
+                "email",
+                "name",
+                "password",
+                "vendor_id"
+            ],
+            "properties": {
+                "email": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "password": {
+                    "type": "string"
+                },
+                "vendor_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "handler.VerifyRequest": {
+            "type": "object",
+            "properties": {
+                "email": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                }
+            }
+        },
+        "models.Item": {
+            "type": "object",
+            "properties": {
+                "product": {
+                    "type": "string"
+                },
+                "quantity": {
+                    "type": "integer"
+                }
+            }
+        },
+        "models.PurchaseResponse": {
+            "type": "object",
+            "properties": {
+                "customer_id": {
+                    "type": "string"
+                },
+                "delivery_fee": {
+                    "type": "number"
+                },
+                "distance_km": {
+                    "type": "number"
+                },
+                "final_price": {
+                    "type": "number"
+                },
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/models.Item"
+                    }
+                },
+                "message": {
+                    "type": "string"
+                },
+                "store_id": {
+                    "type": "string"
+                },
+                "total_product_cost": {
+                    "type": "number"
                 }
             }
         },

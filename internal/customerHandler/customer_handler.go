@@ -34,6 +34,16 @@ func Init() {
 	coreAPI.New(ServerKey, midtrans.Sandbox)
 }
 
+// GetWalletBalance godoc
+// @Summary Retrieve customer wallet balance
+// @Description Retrieves the wallet balance for the logged-in customer.
+// @Tags Customers
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Success 200 {object} map[string]interface{} "Wallet balance retrieved successfully"
+// @Failure 500 {object} map[string]string "Failed to retrieve wallet balance"
+// @Router /customers/wallet-balance [get]
 func GetWalletBalance(c echo.Context) error {
 	// Extract customer ID from JWT claims
 	user := c.Get("user").(*jwt.Token)
@@ -54,6 +64,18 @@ func GetWalletBalance(c echo.Context) error {
 	})
 }
 
+// WithdrawMoney godoc
+// @Summary Initiate a withdrawal for the customer
+// @Description Processes a withdrawal request for the customer and creates a virtual account number for the transaction.
+// @Tags Customers
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param request body PaymentRequest true "Withdrawal request body"
+// @Success 200 {object} map[string]interface{} "Withdrawal initiated successfully"
+// @Failure 400 {object} map[string]string "Invalid request or withdrawal amount"
+// @Failure 500 {object} map[string]string "Failed to process withdrawal"
+// @Router /customers/withdraw [post]
 func WithdrawMoney(c echo.Context) error {
 	// Initialize Midtrans
 	Init()
@@ -131,7 +153,18 @@ func WithdrawMoney(c echo.Context) error {
 	})
 }
 
-// check withdrawal status for customer
+// CheckWithdrawalStatus godoc
+// @Summary Check withdrawal status
+// @Description Checks the status of a customer's withdrawal transaction.
+// @Tags Customers
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param order_id path string true "Order ID of the transaction"
+// @Success 200 {object} map[string]interface{} "Transaction status retrieved successfully"
+// @Failure 400 {object} map[string]string "Invalid transaction request"
+// @Failure 500 {object} map[string]string "Failed to fetch transaction status"
+// @Router /customers/withdrawal-status/{order_id} [get]
 func CheckWithdrawalStatus(c echo.Context) error {
 	Init() // Initialize Midtrans
 
@@ -196,6 +229,18 @@ func CheckWithdrawalStatus(c echo.Context) error {
 	})
 }
 
+// CheckPurchaseStatus godoc
+// @Summary Check purchase status
+// @Description Checks the status of a customer's purchase transaction and updates inventory if successful.
+// @Tags Customers
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param order_id path string true "Order ID of the transaction"
+// @Success 200 {object} map[string]interface{} "Purchase status and inventory updated successfully"
+// @Failure 400 {object} map[string]string "Invalid transaction or insufficient stock"
+// @Failure 500 {object} map[string]string "Failed to fetch transaction status or update inventory"
+// @Router /customers/purchase-status/{order_id} [get]
 func CheckPurchaseStatus(c echo.Context) error {
 	Init() // Initialize Midtrans
 
@@ -400,6 +445,17 @@ func CheckPurchaseStatus(c echo.Context) error {
 	})
 }
 
+// GetCustomerTokens godoc
+// @Summary Retrieve customer tokens
+// @Description Retrieves all tokens for the logged-in customer.
+// @Tags Customers
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Success 200 {object} map[string]interface{} "Customer tokens fetched successfully"
+// @Failure 401 {object} map[string]string "Unauthorized: Missing or invalid customer ID"
+// @Failure 500 {object} map[string]string "Failed to fetch or parse tokens"
+// @Router /customers/tokens [get]
 func GetCustomerTokens(c echo.Context) error {
 	// Extract customer ID from JWT claims
 	user := c.Get("user").(*jwt.Token)
@@ -458,6 +514,15 @@ func GetCustomerTokens(c echo.Context) error {
 	})
 }
 
+// GetAllStoreCoordinate godoc
+// @Summary Retrieve all store coordinates
+// @Description Retrieves the coordinates of all stores.
+// @Tags Stores
+// @Accept json
+// @Produce json
+// @Success 200 {object} map[string]interface{} "Store coordinates retrieved successfully"
+// @Failure 500 {object} map[string]string "Failed to fetch store coordinates"
+// @Router /stores/coordinates [get]
 func GetAllStoreCoordinate(c echo.Context) error {
 	// Query to fetch all store coordinates
 	query := `

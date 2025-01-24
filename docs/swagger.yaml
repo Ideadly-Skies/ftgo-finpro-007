@@ -35,6 +35,40 @@ definitions:
     - password
     - store_id
     type: object
+  ftgo-finpro_internal_customerHandler_models.LoginRequest:
+    properties:
+      email:
+        type: string
+      password:
+        type: string
+    required:
+    - email
+    - password
+    type: object
+  ftgo-finpro_internal_customerHandler_models.LoginResponse:
+    properties:
+      email:
+        type: string
+      name:
+        type: string
+      token:
+        type: string
+      wallet_balance:
+        type: number
+    type: object
+  ftgo-finpro_internal_customerHandler_models.RegisterRequest:
+    properties:
+      email:
+        type: string
+      name:
+        type: string
+      password:
+        type: string
+    required:
+    - email
+    - name
+    - password
+    type: object
   handler.FacilitatePurchaseRequest:
     properties:
       customer_id:
@@ -50,6 +84,42 @@ definitions:
     - customer_id
     - items
     - payment_method
+    type: object
+  handler.LoginFactoryAdminRequest:
+    properties:
+      email:
+        type: string
+      password:
+        type: string
+    required:
+    - email
+    - password
+    type: object
+  handler.LoginVendorAdminRequest:
+    properties:
+      email:
+        type: string
+      password:
+        type: string
+    required:
+    - email
+    - password
+    type: object
+  handler.LoginVendorAdminResponse:
+    properties:
+      email:
+        type: string
+      name:
+        type: string
+      token:
+        type: string
+    type: object
+  handler.PaymentRequest:
+    properties:
+      amount:
+        type: number
+    required:
+    - amount
     type: object
   handler.PurchaseItem:
     properties:
@@ -80,6 +150,73 @@ definitions:
     required:
     - token
     type: object
+  handler.RegisterFactoryAdminRequest:
+    properties:
+      email:
+        type: string
+      factory_id:
+        type: string
+      name:
+        type: string
+      password:
+        type: string
+    required:
+    - email
+    - factory_id
+    - name
+    - password
+    type: object
+  handler.RegisterVendorAdminRequest:
+    properties:
+      email:
+        type: string
+      name:
+        type: string
+      password:
+        type: string
+      vendor_id:
+        type: string
+    required:
+    - email
+    - name
+    - password
+    - vendor_id
+    type: object
+  handler.VerifyRequest:
+    properties:
+      email:
+        type: string
+      name:
+        type: string
+    type: object
+  models.Item:
+    properties:
+      product:
+        type: string
+      quantity:
+        type: integer
+    type: object
+  models.PurchaseResponse:
+    properties:
+      customer_id:
+        type: string
+      delivery_fee:
+        type: number
+      distance_km:
+        type: number
+      final_price:
+        type: number
+      items:
+        items:
+          $ref: '#/definitions/models.Item'
+        type: array
+      message:
+        type: string
+      store_id:
+        type: string
+      total_product_cost:
+        type: number
+    type: object
   models.VerifyCustomerRequest:
     properties:
       email:
@@ -100,6 +237,369 @@ info:
   title: FTGO PlasCash Project
   version: "1.0"
 paths:
+  /customers/purchase-status/{order_id}:
+    get:
+      consumes:
+      - application/json
+      description: Checks the status of a customer's purchase transaction and updates
+        inventory if successful.
+      parameters:
+      - description: Order ID of the transaction
+        in: path
+        name: order_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Purchase status and inventory updated successfully
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Invalid transaction or insufficient stock
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Failed to fetch transaction status or update inventory
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Check purchase status
+      tags:
+      - Customers
+  /customers/tokens:
+    get:
+      consumes:
+      - application/json
+      description: Retrieves all tokens for the logged-in customer.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Customer tokens fetched successfully
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: 'Unauthorized: Missing or invalid customer ID'
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Failed to fetch or parse tokens
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Retrieve customer tokens
+      tags:
+      - Customers
+  /customers/wallet-balance:
+    get:
+      consumes:
+      - application/json
+      description: Retrieves the wallet balance for the logged-in customer.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Wallet balance retrieved successfully
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Failed to retrieve wallet balance
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Retrieve customer wallet balance
+      tags:
+      - Customers
+  /customers/withdraw:
+    post:
+      consumes:
+      - application/json
+      description: Processes a withdrawal request for the customer and creates a virtual
+        account number for the transaction.
+      parameters:
+      - description: Withdrawal request body
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handler.PaymentRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Withdrawal initiated successfully
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Invalid request or withdrawal amount
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Failed to process withdrawal
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Initiate a withdrawal for the customer
+      tags:
+      - Customers
+  /customers/withdrawal-status/{order_id}:
+    get:
+      consumes:
+      - application/json
+      description: Checks the status of a customer's withdrawal transaction.
+      parameters:
+      - description: Order ID of the transaction
+        in: path
+        name: order_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Transaction status retrieved successfully
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Invalid transaction request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Failed to fetch transaction status
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Check withdrawal status
+      tags:
+      - Customers
+  /factory-admin/login:
+    post:
+      consumes:
+      - application/json
+      description: Authenticates a factory admin using their email and password and
+        returns a JWT token.
+      parameters:
+      - description: Login Factory Admin Request
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/handler.LoginFactoryAdminRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Login successful with token
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Invalid email or password
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal server error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Login for factory admin
+      tags:
+      - Factory Admin
+  /factory-admin/register:
+    post:
+      consumes:
+      - application/json
+      description: Registers a new factory admin with a name, email, password, and
+        associated factory ID.
+      parameters:
+      - description: Register Factory Admin Request
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/handler.RegisterFactoryAdminRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Admin registered successfully
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Invalid request or email already registered
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal server error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Register a factory admin
+      tags:
+      - Factory Admin
+  /factory-admin/request/{request_id}:
+    post:
+      consumes:
+      - application/json
+      description: Processes a pending vendor request for a specific vending machine,
+        updates vendor revenue, and resets the vending machine.
+      parameters:
+      - description: Request ID
+        in: path
+        name: request_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Request processed successfully
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Invalid request ID or unauthorized access
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Request or vending machine not found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal server error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Process a factory vendor request
+      tags:
+      - Factory Admin
+  /login-customer:
+    post:
+      consumes:
+      - application/json
+      description: This endpoint authenticates a customer using their email and password
+        and returns a JWT token.
+      parameters:
+      - description: Request body for logging in a customer
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/ftgo-finpro_internal_customerHandler_models.LoginRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Login successful with token and customer details
+          schema:
+            $ref: '#/definitions/ftgo-finpro_internal_customerHandler_models.LoginResponse'
+      summary: Login a customer
+      tags:
+      - Customers
+  /purchase/online:
+    post:
+      consumes:
+      - application/json
+      description: Handles customer purchase requests and processes payments via wallet
+        or online methods.
+      parameters:
+      - description: Purchase Request Body
+        in: body
+        name: purchaseRequest
+        required: true
+        schema:
+          $ref: '#/definitions/handler.FacilitatePurchaseRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Purchase successful
+          schema:
+            $ref: '#/definitions/models.PurchaseResponse'
+        "400":
+          description: Invalid request or insufficient stock/wallet balance
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Failed to process purchase or update inventory
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Facilitate an online purchase
+      tags:
+      - Purchases
+  /register-customer:
+    post:
+      consumes:
+      - application/json
+      description: This endpoint registers a new customer with name, email, and password.
+      parameters:
+      - description: Request body for registering a customer
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/ftgo-finpro_internal_customerHandler_models.RegisterRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Customer registered successfully
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Register a new customer
+      tags:
+      - Customers
   /store-admin/login:
     post:
       consumes:
@@ -303,6 +803,277 @@ paths:
       summary: Register a store admin
       tags:
       - StoreAdmin
+  /stores/coordinates:
+    get:
+      consumes:
+      - application/json
+      description: Retrieves the coordinates of all stores.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Store coordinates retrieved successfully
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Failed to fetch store coordinates
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Retrieve all store coordinates
+      tags:
+      - Stores
+  /vendor-admin/login:
+    post:
+      consumes:
+      - application/json
+      description: Authenticates a vendor admin using email and password, returning
+        a JWT token.
+      parameters:
+      - description: Vendor Admin Login Request
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/handler.LoginVendorAdminRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Login successful with token
+          schema:
+            $ref: '#/definitions/handler.LoginVendorAdminResponse'
+        "400":
+          description: Invalid email or password
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal server error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Login for vendor admin
+      tags:
+      - Vendor Admin
+  /vendor-admin/recycle/{transaction_id}:
+    post:
+      consumes:
+      - application/json
+      description: Processes a customer recycling transaction, calculates rewards,
+        and generates a token.
+      parameters:
+      - description: Transaction ID
+        in: path
+        name: transaction_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Recycling facilitated successfully
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Invalid or unauthorized transaction
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal server error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Facilitate customer recycling
+      tags:
+      - Vendor Admin
+  /vendor-admin/register:
+    post:
+      consumes:
+      - application/json
+      description: Registers a new vendor admin with name, email, password, and vendor
+        ID.
+      parameters:
+      - description: Vendor Admin Registration Request
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/handler.RegisterVendorAdminRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Vendor admin registered successfully
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Invalid request or email already registered
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal server error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Register a vendor admin
+      tags:
+      - Vendor Admin
+  /vendor-admin/transactions:
+    get:
+      consumes:
+      - application/json
+      description: Retrieves all transactions associated with the authenticated vendor.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Transactions fetched successfully
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized access
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal server error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Get transactions for a vendor
+      tags:
+      - Vendor Admin
+  /vendor-admin/vending-machine/{vending_machine_id}/pickup:
+    post:
+      consumes:
+      - application/json
+      description: Creates a pickup request for a full vending machine.
+      parameters:
+      - description: Vending Machine ID
+        in: path
+        name: vending_machine_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Pickup requested successfully
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Invalid vending machine ID or vending machine is not full
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal server error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Request a vending machine pickup
+      tags:
+      - Vendor Admin
+  /vendor-admin/vending-machine/{vending_machine_id}/status:
+    get:
+      consumes:
+      - application/json
+      description: Retrieves the status of a specific vending machine.
+      parameters:
+      - description: Vending Machine ID
+        in: path
+        name: vending_machine_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Vending machine status retrieved successfully
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Invalid vending machine ID
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal server error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Get vending machine status
+      tags:
+      - Vendor Admin
+  /verification/request:
+    post:
+      consumes:
+      - application/json
+      description: Sends an email verification request to the user with the provided
+        email and name.
+      parameters:
+      - description: Verification Request
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/handler.VerifyRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Your verification request has been received, kindly check your
+            email regularly.
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Invalid request body or missing fields
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Failed to send email
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Request email verification
+      tags:
+      - Verification
   /verify-customer:
     post:
       consumes:

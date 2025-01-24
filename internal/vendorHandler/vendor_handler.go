@@ -67,6 +67,17 @@ type LoginVendorAdminResponse struct {
 
 var jwtSecret = os.Getenv("JWT_SECRET")
 
+// RegisterVendorAdmin godoc
+// @Summary Register a vendor admin
+// @Description Registers a new vendor admin with name, email, password, and vendor ID.
+// @Tags Vendor Admin
+// @Accept json
+// @Produce json
+// @Param body body handler.RegisterVendorAdminRequest true "Vendor Admin Registration Request"
+// @Success 200 {object} map[string]interface{} "Vendor admin registered successfully"
+// @Failure 400 {object} map[string]string "Invalid request or email already registered"
+// @Failure 500 {object} map[string]string "Internal server error"
+// @Router /vendor-admin/register [post]
 func RegisterVendorAdmin(c echo.Context) error {
 	var req RegisterVendorAdminRequest
 	if err := c.Bind(&req); err != nil {
@@ -118,6 +129,17 @@ func RegisterVendorAdmin(c echo.Context) error {
 	})
 }
 
+// LoginVendorAdmin godoc
+// @Summary Login for vendor admin
+// @Description Authenticates a vendor admin using email and password, returning a JWT token.
+// @Tags Vendor Admin
+// @Accept json
+// @Produce json
+// @Param body body handler.LoginVendorAdminRequest true "Vendor Admin Login Request"
+// @Success 200 {object} handler.LoginVendorAdminResponse "Login successful with token"
+// @Failure 400 {object} map[string]string "Invalid email or password"
+// @Failure 500 {object} map[string]string "Internal server error"
+// @Router /vendor-admin/login [post]
 func LoginVendorAdmin(c echo.Context) error {
 	var req LoginVendorAdminRequest
 	if err := c.Bind(&req); err != nil {
@@ -172,6 +194,17 @@ func LoginVendorAdmin(c echo.Context) error {
 	})
 }
 
+// GetTransactions godoc
+// @Summary Get transactions for a vendor
+// @Description Retrieves all transactions associated with the authenticated vendor.
+// @Tags Vendor Admin
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Success 200 {object} map[string]interface{} "Transactions fetched successfully"
+// @Failure 401 {object} map[string]string "Unauthorized access"
+// @Failure 500 {object} map[string]string "Internal server error"
+// @Router /vendor-admin/transactions [get]
 func GetTransactions(c echo.Context) error {
 	// Extract the JWT token claims
 	user := c.Get("user").(*jwt.Token)
@@ -248,6 +281,18 @@ func GenerateToken(customerID, vendorID string, amount float64) (string, error) 
 	return token.SignedString([]byte(vendorCustomerSecret))
 }
 
+// FacilitateCustomerRecycle godoc
+// @Summary Facilitate customer recycling
+// @Description Processes a customer recycling transaction, calculates rewards, and generates a token.
+// @Tags Vendor Admin
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param transaction_id path string true "Transaction ID"
+// @Success 200 {object} map[string]interface{} "Recycling facilitated successfully"
+// @Failure 400 {object} map[string]string "Invalid or unauthorized transaction"
+// @Failure 500 {object} map[string]string "Internal server error"
+// @Router /vendor-admin/recycle/{transaction_id} [post]
 func FacilitateCustomerRecycle(c echo.Context) error {
 	// Authenticate and extract vendor admin claims
 	user := c.Get("user").(*jwt.Token)
@@ -381,7 +426,18 @@ func FacilitateCustomerRecycle(c echo.Context) error {
 	})
 }
 
-// check vending machine fill status
+// GetVendingMachineStatus godoc
+// @Summary Get vending machine status
+// @Description Retrieves the status of a specific vending machine.
+// @Tags Vendor Admin
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param vending_machine_id path string true "Vending Machine ID"
+// @Success 200 {object} map[string]interface{} "Vending machine status retrieved successfully"
+// @Failure 400 {object} map[string]string "Invalid vending machine ID"
+// @Failure 500 {object} map[string]string "Internal server error"
+// @Router /vendor-admin/vending-machine/{vending_machine_id}/status [get]
 func GetVendingMachineStatus(c echo.Context) error {
 	// Extract vending machine ID from the URL
 	vendingMachineID := c.Param("vending_machine_id")
@@ -421,7 +477,18 @@ func GetVendingMachineStatus(c echo.Context) error {
 	})
 }
 
-// RequestPickup handles creating a pickup request for a vending machine
+// RequestPickup godoc
+// @Summary Request a vending machine pickup
+// @Description Creates a pickup request for a full vending machine.
+// @Tags Vendor Admin
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param vending_machine_id path string true "Vending Machine ID"
+// @Success 200 {object} map[string]string "Pickup requested successfully"
+// @Failure 400 {object} map[string]string "Invalid vending machine ID or vending machine is not full"
+// @Failure 500 {object} map[string]string "Internal server error"
+// @Router /vendor-admin/vending-machine/{vending_machine_id}/pickup [post]
 func RequestPickup(c echo.Context) error {
 	// Extract vendor admin details from JWT claims
 	user := c.Get("user").(*jwt.Token)

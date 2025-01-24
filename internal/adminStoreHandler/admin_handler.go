@@ -18,15 +18,28 @@ import (
 	"strings"
 )
 
-// Initialize Midtrans Core API client
-var coreAPI coreapi.Client
+// CoreAPIInterface defines the interface for Midtrans Core API client
+type CoreAPIInterface interface {
+	ChargeTransaction(request *coreapi.ChargeReq) (*coreapi.ChargeResponse, *midtrans.Error)
+}
+
+// CoreAPIInstance holds the current Core API client instance
+var CoreAPIInstance CoreAPIInterface
+
+// SetCoreAPI allows dependency injection of a CoreAPI implementation
+func SetCoreAPI(api CoreAPIInterface) {
+	CoreAPIInstance = api
+}
 
 func Init() {
 	// retrieve server key from .env
 	ServerKey := os.Getenv("ServerKey")
 
-	coreAPI = coreapi.Client{}
-	coreAPI.New(ServerKey, midtrans.Sandbox)
+	client := coreapi.Client{}
+	client.New(ServerKey, midtrans.Sandbox)
+
+	// Set the CoreAPIInstance to the actual implementation
+	CoreAPIInstance = &client
 }
 
 func FacilitatePurchase(c echo.Context) error {
@@ -180,7 +193,7 @@ func FacilitatePurchase(c echo.Context) error {
 		}
 
 		// Send the charge request to Midtrans
-		resp, err := coreAPI.ChargeTransaction(request)
+		resp, err := CoreAPIInstance.ChargeTransaction(request)
 		if err != nil {
 			return c.JSON(http.StatusInternalServerError, map[string]string{"message": "Failed to process online payment"})
 		}
@@ -420,7 +433,7 @@ func RecycleMaterials(c echo.Context) error {
 	if _, err := config.Pool.Exec(ctx, updateVendingMachineQuery, currentWeight, currentFill, storeID); err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]string{"message": "Failed to update vending machine"})
 	}
-
+	
 	// Log the transaction in the vending_transactions table
 	transactionQuery := `
         INSERT INTO vending_transactions 

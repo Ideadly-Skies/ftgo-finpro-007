@@ -7,6 +7,7 @@ import (
 	factory_handler "ftgo-finpro/internal/factoryHandler"
 	cust_middleware "ftgo-finpro/internal/middleware"
 	vendor_handler "ftgo-finpro/internal/vendorHandler"
+	"ftgo-finpro/utils"
 
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
@@ -61,7 +62,11 @@ func main() {
 	storeAdminGroup.POST("/purchase", admin_handler.FacilitatePurchase)
 	storeAdminGroup.POST("/recycle/:customer_id", admin_handler.RecycleMaterials)
 	storeAdminGroup.POST("/redeem-token/:customer_id", admin_handler.RedeemToken)
-	storeAdminGroup.POST("/customer-verify", admin_handler.VerifyCustomer)
+	// Customer verification route
+	storeAdminGroup.POST("/customer-verify", func(c echo.Context) error {
+		// Pass `utils.SendEmailVerifNotification` as the email function dependency
+		return admin_handler.VerifyCustomer(c, utils.SendEmailVerifNotification)
+	})
 
 	/* protected routes for vendor admin using JWT middleware */
 	vendorAdminGroup := e.Group("/vendor-admin")

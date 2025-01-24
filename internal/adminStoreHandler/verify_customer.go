@@ -2,7 +2,7 @@ package handler
 
 import (
 	"context"
-	config "ftgo-finpro/config/database"
+	"ftgo-finpro/config/database"
 	"ftgo-finpro/internal/adminStoreHandler/models"
 	"ftgo-finpro/utils"
 	"github.com/labstack/echo/v4"
@@ -10,7 +10,7 @@ import (
 	"net/http"
 )
 
-func VerifyCustomer(c echo.Context) error {
+func VerifyCustomer(c echo.Context, sendEmailFunc func(string) error) error {
 	var req models.VerifyCustomerRequest
 
 	if err := c.Bind(&req); err != nil {
@@ -51,8 +51,8 @@ func VerifyCustomer(c echo.Context) error {
 		return c.JSON(http.StatusNotFound, map[string]string{"message": "Customer not found"})
 	}
 
-	// Kirim notifikasi/email
-	if err = utils.SendEmailVerifNotification(req.Email); err != nil {
+	// Send notification/email using the provided function
+	if err = sendEmailFunc(req.Email); err != nil {
 		log.Printf("Failed to send email: %v", err)
 		return c.JSON(http.StatusInternalServerError, map[string]string{"message": "Failed to send email"})
 	}

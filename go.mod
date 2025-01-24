@@ -1,6 +1,6 @@
 module ftgo-finpro
 
-go 1.23.4
+go 1.23
 
 require (
 	github.com/golang-jwt/jwt/v4 v4.5.1
@@ -29,7 +29,7 @@ require (
 	github.com/mailru/easyjson v0.7.7 // indirect
 	github.com/stretchr/objx v0.5.2 // indirect
 	github.com/swaggo/files/v2 v2.0.0 // indirect
-	github.com/swaggo/swag v1.8.12 // indirect
+	github.com/swaggo/swag v1.8.12 // direct
 	golang.org/x/tools v0.22.0 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 )

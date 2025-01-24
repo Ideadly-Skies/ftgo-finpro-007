@@ -20,7 +20,17 @@ import (
 
 var jwtSecret = os.Getenv("JWT_SECRET")
 
-// RegisterStoreAdmin handles store admin registration
+// RegisterStoreAdmin godoc
+// @Summary Register a store admin
+// @Description Registers a new store admin with the provided details
+// @Tags StoreAdmin
+// @Accept json
+// @Produce json
+// @Param request body models.RegisterRequest true "Store admin registration request"
+// @Success 200 {object} map[string]interface{}
+// @Failure 400 {object} map[string]string
+// @Failure 500 {object} map[string]string
+// @Router /store-admin/register [post]
 func RegisterStoreAdmin(c echo.Context) error {
 	var req models.RegisterRequest
 	if err := c.Bind(&req); err != nil {
@@ -72,7 +82,17 @@ func RegisterStoreAdmin(c echo.Context) error {
 	})
 }
 
-// LoginStoreAdmin handles store admin login
+// LoginStoreAdmin godoc
+// @Summary Login a store admin
+// @Description Authenticates a store admin and returns a JWT token
+// @Tags StoreAdmin
+// @Accept json
+// @Produce json
+// @Param request body models.LoginRequest true "Store admin login request"
+// @Success 200 {object} models.LoginResponse
+// @Failure 400 {object} map[string]string
+// @Failure 500 {object} map[string]string
+// @Router /store-admin/login [post]
 func LoginStoreAdmin(c echo.Context) error {
 	var req models.LoginRequest
 	if err := c.Bind(&req); err != nil {

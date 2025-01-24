@@ -10,6 +10,18 @@ import (
 	"net/http"
 )
 
+// VerifyCustomer godoc
+// @Summary Verify a customer by email
+// @Description This endpoint verifies a customer by their email address.
+// @Tags StoreAdmin 
+// @Accept json
+// @Produce json
+// @Param request body models.VerifyCustomerRequest true "Request body containing the customer's email"
+// @Success 200 {object} map[string]string "Customer verified successfully"
+// @BadRequest 400 {object} map[string]string "Invalid request or email already verified"
+// @NotFound 404 {object} map[string]string "Customer not found"
+// @InternalServerError 500 {object} map[string]string "Failed to check verification status or send email"
+// @Router /verify-customer [post]
 func VerifyCustomer(c echo.Context, sendEmailFunc func(string) error) error {
 	var req models.VerifyCustomerRequest
 

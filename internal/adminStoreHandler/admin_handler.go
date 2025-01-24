@@ -18,6 +18,31 @@ import (
 	"strings"
 )
 
+// FacilitatePurchaseRequest represents the request payload for the FacilitatePurchase endpoint
+type FacilitatePurchaseRequest struct {
+	CustomerID    string              `json:"customer_id" validate:"required"`
+	Items         []PurchaseItem      `json:"items" validate:"required"`
+	PaymentMethod string              `json:"payment_method" validate:"required"` // "Wallet" or "Online"
+}
+
+// PurchaseItem represents an individual item in the purchase request
+type PurchaseItem struct {
+	Product  string `json:"product" validate:"required"`
+	Quantity int    `json:"quantity" validate:"required,min=1"`
+}
+
+// RecycleMaterialsRequest represents the request payload for the RecycleMaterials endpoint
+type RecycleMaterialsRequest struct {
+	Product  string `json:"product" validate:"required"`
+	Quantity int    `json:"quantity" validate:"required,min=1"`
+}
+
+// RedeemTokenRequest represents the request payload for the RedeemToken endpoint
+type RedeemTokenRequest struct {
+	Token string `json:"token" validate:"required"`
+}
+
+
 // CoreAPIInterface defines the interface for Midtrans Core API client
 type CoreAPIInterface interface {
 	ChargeTransaction(request *coreapi.ChargeReq) (*coreapi.ChargeResponse, *midtrans.Error)
@@ -42,6 +67,18 @@ func Init() {
 	CoreAPIInstance = &client
 }
 
+// FacilitatePurchase godoc
+// @Summary Facilitate a purchase in a store
+// @Description Facilitates a purchase by deducting inventory and processing payment via wallet or online methods
+// @Tags StoreAdmin
+// @Accept json
+// @Produce json
+// @Param Authorization header string true "Bearer token"
+// @Param request body handler.FacilitatePurchaseRequest true "Purchase request"
+// @Success 200 {object} map[string]interface{}
+// @Failure 400 {object} map[string]string
+// @Failure 500 {object} map[string]string
+// @Router /store-admin/purchase [post]
 func FacilitatePurchase(c echo.Context) error {
 	// Extract admin claims
 	admin := c.Get("user").(*jwt.Token)
@@ -310,6 +347,19 @@ func FacilitatePurchase(c echo.Context) error {
 	})
 }
 
+// RecycleMaterials godoc
+// @Summary Recycle materials into a vending machine
+// @Description Processes recycling requests from customers and updates vending machine status
+// @Tags StoreAdmin
+// @Accept json
+// @Produce json
+// @Param Authorization header string true "Bearer token"
+// @Param customer_id path string true "Customer ID"
+// @Param request body []handler.RecycleMaterialsRequest true "Recycling request"
+// @Success 200 {object} map[string]interface{}
+// @Failure 400 {object} map[string]string
+// @Failure 500 {object} map[string]string
+// @Router /store-admin/recycle/{customer_id} [post]
 func RecycleMaterials(c echo.Context) error {
 	// Extract admin claims from the JWT
 	admin := c.Get("user").(*jwt.Token)
@@ -490,7 +540,19 @@ func DecodeToken(tokenString string) (map[string]interface{}, error) {
 	return nil, fmt.Errorf("invalid or expired token")
 }
 
-// redeem token for the user
+// RedeemToken godoc
+// @Summary Redeem a token for wallet balance
+// @Description Redeems a customer token and updates the wallet balance
+// @Tags StoreAdmin
+// @Accept json
+// @Produce json
+// @Param Authorization header string true "Bearer token"
+// @Param customer_id path string true "Customer ID"
+// @Param request body handler.RedeemTokenRequest true "Token redemption request"
+// @Success 200 {object} map[string]interface{}
+// @Failure 400 {object} map[string]string
+// @Failure 500 {object} map[string]string
+// @Router /store-admin/redeem-token/{customer_id} [post]
 func RedeemToken(c echo.Context) error {
 	// Get customer ID from URL parameters
 	customerID := c.Param("customer_id")

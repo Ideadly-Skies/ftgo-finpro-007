@@ -1,6 +1,7 @@
 package main
 
 import (
+	_ "ftgo-finpro/docs"
 	"ftgo-finpro/config/database"
 	admin_handler "ftgo-finpro/internal/adminStoreHandler"
 	customer_handler "ftgo-finpro/internal/customerHandler"
@@ -11,11 +12,23 @@ import (
 
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
+	echoSwagger "github.com/swaggo/echo-swagger"
 )
 
+// @title FTGO PlasCash Project
+// @version 1.0
+// @description API documentation for the FTGO PlashCash project.
+// @termsOfService http://example.com/terms/
+// @contact.Obie API Support
+// @contact.url www.linkedin.com/in/obie-ananda-a87a64212 
+// @contact.email Obie.kal22@gmail.com
+// @license.name MIT
+// @license.url http://opensource.org/licenses/MIT
+// @host localhost:8080
+// @BasePath /
 func main() {
 	// migrate data to supabase
-	config.MigrateData()
+	// config.MigrateData()
 
 	// connect to db
 	config.InitDB()
@@ -26,6 +39,9 @@ func main() {
 
 	e.Use(middleware.Logger())
 	e.Use(middleware.Recover())
+
+	// Swagger route
+	e.GET("/swagger/*", echoSwagger.WrapHandler)
 
 	// public routes
 	e.POST("/customer/register", customer_handler.RegisterCustomer)
